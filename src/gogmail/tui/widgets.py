@@ -477,13 +477,17 @@ class GmailTab(Vertical):
             msg = self.selected_msg
             headers = msg.get("headers", {})
             self.post_message(StatusNotification("Generating summary with Gemini..."))
-            summary = await GeminiAPI.summarize_email(
-                subject=headers.get("subject", ""),
-                sender=headers.get("from", ""),
-                body=format_email_body(msg.get("body", ""))
-            )
-            # Display summary in the text pane
             body_view = self.query_one("#email-body-view")
+            body_view.loading = True
+            try:
+                summary = await GeminiAPI.summarize_email(
+                    subject=headers.get("subject", ""),
+                    sender=headers.get("from", ""),
+                    body=format_email_body(msg.get("body", ""))
+                )
+            finally:
+                body_view.loading = False
+            # Display summary in the text pane
             body_view.clear()
             body_view.write("[bold green]=== GEMINI SUMMARY ===[/bold green]\n")
             body_view.write(summary)
@@ -1081,10 +1085,14 @@ class DocsTab(DriveMimeTab):
         doc_id = event.row_key.value
         self.post_message(StatusNotification(f"Reading Doc {doc_id}..."))
 
-        text = await GogAPI.docs_cat(doc_id)
         viewer = self.query_one("#doc-viewer")
         viewer.clear()
-        viewer.write(text)
+        viewer.loading = True
+        try:
+            text = await GogAPI.docs_cat(doc_id)
+        finally:
+            viewer.loading = False
+        viewer.write(text if text.strip() else "[dim](Empty document.)[/dim]")
         self.post_message(StatusNotification("Doc read successfully."))
 
 
