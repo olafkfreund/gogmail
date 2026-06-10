@@ -167,6 +167,7 @@ class GmailComposeScreen(ModalScreen):
             Horizontal(
                 Button("Generate AI Draft", variant="primary", id="ai-draft-btn"),
                 Button("Editor", variant="primary", id="external-editor-btn"),
+                Button("Save Draft", variant="primary", id="save-draft-btn"),
                 Button("Send", variant="success", id="send-btn"),
                 Button("Cancel", id="cancel-btn"),
                 classes="btn-row"
@@ -193,15 +194,12 @@ class GmailComposeScreen(ModalScreen):
     async def on_button_pressed(self, event: Button.Pressed):
         if event.button.id == "cancel-btn":
             self.dismiss(None)
-        elif event.button.id == "send-btn":
-            to = self.query_one("#email-to").value
-            subject = self.query_one("#email-subject").value
-            body = self.query_one("#email-body").text
+        elif event.button.id in ("send-btn", "save-draft-btn"):
             self.dismiss({
-                "action": "send",
-                "to": to,
-                "subject": subject,
-                "body": body,
+                "action": "draft" if event.button.id == "save-draft-btn" else "send",
+                "to": self.query_one("#email-to").value,
+                "subject": self.query_one("#email-subject").value,
+                "body": self.query_one("#email-body").text,
                 "thread_id": self.thread_id,
                 "reply_to_message_id": self.reply_to_message_id
             })

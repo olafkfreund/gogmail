@@ -316,6 +316,8 @@ class GmailTab(Vertical):
                 yield Horizontal(
                     Button("⬅ Back", variant="primary", id="gmail-back-btn"),
                     Button("Reply", variant="success", id="gmail-reply-btn"),
+                    Button("★ Star", variant="primary", id="gmail-star-btn"),
+                    Button("🏷 Label", variant="primary", id="gmail-label-btn"),
                     Button("Archive", variant="primary", id="gmail-archive-btn"),
                     Button("Trash", variant="error", id="gmail-trash-btn"),
                     Button("AI Summary", variant="primary", id="gmail-summary-btn"),
@@ -380,6 +382,9 @@ class GmailTab(Vertical):
 
     async def on_data_table_row_selected(self, event: DataTable.RowSelected):
         thread_id = event.row_key.value
+        self.selected_thread_id = thread_id
+        thread = next((t for t in getattr(self, "threads_data", []) if t.get("id") == thread_id), {})
+        self.selected_labels = thread.get("labels", [])
         self.post_message(StatusNotification(f"Loading email {thread_id}..."))
 
         body_view = self.query_one("#email-body-view")
@@ -441,7 +446,18 @@ class GmailTab(Vertical):
         selected_row_idx = table.cursor_row
         thread_id = table.ordered_rows[selected_row_idx].key.value
         
-        if event.button.id == "gmail-archive-btn":
+        if event.button.id == "gmail-star-btn":
+            starred = "STARRED" in getattr(self, "selected_labels", [])
+            ok = await GogAPI.gmail_modify_labels(
+                thread_id, remove="STARRED" if starred else "", add="" if starred else "STARRED")
+            if ok:
+                self.selected_labels = [l for l in getattr(self, "selected_labels", []) if l != "STARRED"]
+                if not starred:
+                    self.selected_labels.append("STARRED")
+                self.post_message(StatusNotification("Unstarred." if starred else "Starred."))
+        elif event.button.id == "gmail-label-btn":
+            self.app.open_gmail_label_dialog(thread_id)
+        elif event.button.id == "gmail-archive-btn":
             await GogAPI.gmail_archive(thread_id)
             self.post_message(StatusNotification(f"Archived {thread_id}"))
             self.query_one("#gmail-switcher").current = "gmail-list-view"

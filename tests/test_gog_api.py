@@ -124,6 +124,28 @@ class TestContactSuggestions(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(any("NoMail" in s for s in sugs))
 
 
+class TestGmailLabelsAndDrafts(unittest.IsolatedAsyncioTestCase):
+    async def test_modify_labels_builds_add_remove(self):
+        seen = {}
+        async def fake(args, parse_json=True, quiet=False):
+            seen["args"] = args
+            return True, {}
+        with mock.patch.object(gog_api, "run_gog", fake):
+            ok = await GogAPI.gmail_modify_labels("T1", add="STARRED", remove="UNREAD")
+        self.assertTrue(ok)
+        self.assertEqual(seen["args"], ["gmail", "labels", "modify", "T1", "--add", "STARRED", "--remove", "UNREAD"])
+
+    async def test_labels_list_parses(self):
+        with mock.patch.object(gog_api, "run_gog", _fake_run_gog((True, {"labels": [{"name": "INBOX"}]}))):
+            self.assertEqual(await GogAPI.gmail_labels_list(), [{"name": "INBOX"}])
+
+    async def test_create_draft_returns_str(self):
+        with mock.patch.object(gog_api, "run_gog", _fake_run_gog((True, {"id": "d1"}))):
+            ok, msg = await GogAPI.gmail_create_draft("a@x.com", "Subj", "Body")
+            self.assertTrue(ok)
+            self.assertEqual(msg, '{"id": "d1"}')
+
+
 class TestActiveAccount(unittest.TestCase):
     def tearDown(self):
         gog_api.set_account(None)

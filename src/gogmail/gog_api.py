@@ -206,6 +206,32 @@ class GogAPI:
         return success, _str_result(res)
 
     @staticmethod
+    async def gmail_labels_list() -> list:
+        success, res = await run_gog(["gmail", "labels", "list"])
+        return _extract_list(success, res, "labels")
+
+    @staticmethod
+    async def gmail_modify_labels(thread_id: str, add: str = "", remove: str = "") -> bool:
+        """Add/remove labels (comma-separated names or IDs) on a thread."""
+        args = ["gmail", "labels", "modify", thread_id]
+        if add:
+            args += ["--add", add]
+        if remove:
+            args += ["--remove", remove]
+        success, _ = await run_gog(args)
+        return success
+
+    @staticmethod
+    async def gmail_create_draft(to: str, subject: str, body: str, cc: str = "", bcc: str = "") -> tuple[bool, str]:
+        args = ["gmail", "drafts", "create", "--to", to, "--subject", subject, "--body", body]
+        if cc:
+            args += ["--cc", cc]
+        if bcc:
+            args += ["--bcc", bcc]
+        success, res = await run_gog(args)
+        return success, _str_result(res)
+
+    @staticmethod
     async def gmail_archive(message_id: str) -> bool:
         success, _ = await run_gog(["gmail", "archive", message_id])
         return success

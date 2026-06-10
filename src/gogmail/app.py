@@ -628,7 +628,9 @@ class GogMailApp(App):
     # --- Screen Modal Openers ---
     def open_compose_dialog(self, to="", subject="", body="", thread_id=None, reply_to_message_id=None):
         async def handle_dismiss(result):
-            if result and result.get("action") == "send":
+            if not result:
+                return
+            if result.get("action") == "send":
                 await self._run_mutation(
                     "Sending email...",
                     GogAPI.gmail_send(
@@ -638,7 +640,24 @@ class GogMailApp(App):
                     "Email sent successfully.",
                     lambda: self.query_one(GmailTab).refresh_emails(),
                 )
+            elif result.get("action") == "draft":
+                await self._run_mutation(
+                    "Saving draft...",
+                    GogAPI.gmail_create_draft(
+                        to=result.get("to") or "", subject=result.get("subject") or "",
+                        body=result.get("body") or "",
+                    ),
+                    "Draft saved.",
+                )
         self.push_screen(GmailComposeScreen(to, subject, body, thread_id, reply_to_message_id), handle_dismiss)
+
+    def open_gmail_label_dialog(self, thread_id: str):
+        self._open_prompt(
+            "Apply Label", "Label name (e.g. Receipts, Work)",
+            lambda v: GogAPI.gmail_modify_labels(thread_id, add=v),
+            "Applying label...", "Label applied.",
+            lambda: self.query_one(GmailTab).refresh_emails(),
+        )
 
     def open_calendar_create_dialog(self):
         async def handle_dismiss(result):
