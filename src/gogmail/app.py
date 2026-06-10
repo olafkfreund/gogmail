@@ -18,7 +18,7 @@ from gogmail.tui.screens import (
     PromptDialog, TaskCreateScreen, CalendarCreateScreen, GmailComposeScreen,
     ThemeSelectScreen, THEMES
 )
-from gogmail.gog_api import GogAPI, set_error_sink
+from gogmail.gog_api import GogAPI, set_error_sink, set_account
 from gogmail.gemini_api import GeminiAPI
 
 DEFAULT_THEME = "gruvbox"
@@ -400,6 +400,11 @@ class GogMailApp(App):
 
         self.notify_status(f"Theme: {self.theme_name}")
 
+        # Apply a provisional active account (persisted or $GOG_ACCOUNT) so even
+        # the first calls are scoped; _preflight reconciles it against the real list.
+        self.account = cfg.get("account") or os.environ.get("GOG_ACCOUNT", "")
+        set_account(self.account)
+
         # Surface every gog failure to the user instead of letting it look like empty data.
         set_error_sink(self._on_gog_error)
 
@@ -434,6 +439,9 @@ class GogMailApp(App):
         tree.root.add_leaf("✓ Tasks", data={"type": "tasks"})
         tree.root.add_leaf("💬 Chat", data={"type": "chat"})
 
+        # Populated asynchronously from `gog auth list` in _preflight.
+        self._accounts_node = tree.root.add("👤 Accounts", expand=True)
+
         settings = tree.root.add("⚙ Settings", expand=True)
         settings.add_leaf("🎨 Select Theme", data={"type": "select-theme"})
 
@@ -463,12 +471,54 @@ class GogMailApp(App):
 
     async def _preflight(self) -> None:
         ok, info = await GogAPI.preflight()
-        if ok:
-            self.account = info or os.environ.get("GOG_ACCOUNT", "")
-            self.notify_status("Connected" + (f" as {self.account}" if self.account else ""))
-        else:
+        if not ok:
             self.account = ""
             self.notify_status(info, error=True)
+            return
+
+        # Resolve the account list and reconcile the active account.
+        accounts = await GogAPI.list_accounts()
+        self.accounts = accounts
+        if accounts and self.account not in accounts:
+            self.account = info if info in accounts else accounts[0]
+        elif not self.account:
+            self.account = info or (accounts[0] if accounts else "")
+        set_account(self.account)
+        self._populate_accounts(accounts)
+        self.notify_status("Connected" + (f" as {self.account}" if self.account else ""))
+
+    def _populate_accounts(self, accounts: list) -> None:
+        node = getattr(self, "_accounts_node", None)
+        if node is None:
+            return
+        node.remove_children()
+        for email in accounts:
+            marker = "● " if email == self.account else "  "
+            node.add_leaf(f"{marker}{email}", data={"type": "account", "email": email})
+
+    async def switch_account(self, email: str) -> None:
+        if email == self.account:
+            return
+        self.account = email
+        set_account(email)
+        self.config["account"] = email
+        self.save_settings()
+        self._populate_accounts(getattr(self, "accounts", [email]))
+        # Force every tab to reload under the new account on next view.
+        self._reset_tab_loads()
+        self.notify_status(f"Switched to {email}")
+        # Reload the Gmail inbox immediately (it's the default visible tab).
+        try:
+            await self.query_one(GmailTab).refresh_emails()
+        except Exception:
+            pass
+
+    def _reset_tab_loads(self) -> None:
+        for view_id, _label in TREE_VIEWS.values():
+            try:
+                self.query_one(f"#{view_id}")._loaded = False
+            except Exception:
+                pass
 
     def register_temp_file(self, path: str) -> None:
         """Track a temp file (e.g. exported email HTML) for cleanup on exit."""
@@ -500,6 +550,8 @@ class GogMailApp(App):
             await self.query_one(GmailTab).set_query(data.get("query", "label:INBOX"))
         elif node_type == "select-theme":
             self.open_theme_dialog()
+        elif node_type == "account":
+            await self.switch_account(data.get("email"))
         elif node_type in TREE_VIEWS:
             view_id, label = TREE_VIEWS[node_type]
             switcher.current = view_id

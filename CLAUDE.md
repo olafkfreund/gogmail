@@ -13,19 +13,26 @@ GogMail is a [Textual](https://textual.textualize.io/) TUI client for Google Wor
 
 ```bash
 just run            # Run the app (devenv shell run-app → PYTHONPATH=src python -m gogmail.app)
-just lint           # "lint" == py_compile syntax check over src/ (no real linter configured)
-just check-syntax   # same as lint
+just test           # Run the unittest suite (devenv shell run-tests)
+just lint           # py_compile syntax check over src/
 
 devenv shell        # Enter the dev env, then: python -m gogmail.app
+
+# Nix (inputs wire gog + clipboard/browser/image tools onto PATH):
+nix run             # run the app          (apps.default)
+nix develop         # dev shell            (devShells.default)
+nix flake check     # build + run tests    (checks.default)
 ```
 
-There is **no test suite** and **no formatter/linter** beyond `py_compile`. Adding tests means setting up the harness from scratch.
+Tests are stdlib `unittest` (no pytest); the mockable seam is `gog_api.run_gog`.
 
 Runtime prerequisites (the app will not function without these):
-- `gog` CLI installed and authenticated (`gog status`, `gog auth list`).
-- `GEMINI_API_KEY` exported. `GEMINI_MODEL_DEFAULT` optionally overrides the model (default `gemini-2.5-flash`).
+- `gog` CLI installed and authenticated (`gog status`, `gog auth list`). The Nix package wraps `gogcli` onto PATH; a `gog` already on PATH wins.
+- `GEMINI_API_KEY` exported (or `geminiApiKeyFile` via the Nix modules). `GEMINI_MODEL_DEFAULT` optionally overrides the model.
 
-Nix: `nix build` produces the `gogmail` package via `flake.nix`. `nixos-module.nix` exposes `programs.gogmail` (sets `GEMINI_API_KEY`, `GEMINI_MODEL_DEFAULT`, `GOG_ACCOUNT` as session vars). Dependencies are declared in **three** places that must stay in sync: `pyproject.toml`, `devenv.nix`, and `flake.nix`.
+Nix outputs (`flake.nix`): `packages`/`apps`/`devShells`/`checks` per system, plus `nixosModules.gogmail` and `homeManagerModules.gogmail`. Both modules expose `programs.gogmail` with `geminiApiKeyFile` (secret-safe, read at runtime via a wrapper) and a literal `geminiApiKey` (warns: world-readable store). Python deps are declared in **three** places that must stay in sync: `pyproject.toml`, `devenv.nix`, `flake.nix`.
+
+**Multiple accounts:** `gog` is multi-account; `run_gog` scopes API calls to the active account via `-a <email>` (set with `set_account`, never applied to `auth` commands). The app lists accounts via `GogAPI.list_accounts()`, shows them under the sidebar **👤 Accounts** node, and `switch_account()` changes the active one (persisted to config, resets tab `_loaded` flags, reloads).
 
 > Note: the real working clone is `/home/olafkfreund/Source/GitHub/gogmail`. The `/mnt/data/...` primary dir is empty.
 

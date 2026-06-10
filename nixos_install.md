@@ -2,19 +2,37 @@
 
 This guide explains how to install and configure GogMail on NixOS using the provided flake and NixOS module options.
 
+## 0. Quick try (no install)
+
+```bash
+nix run github:olafkfreund/gogmail        # run the app
+nix develop github:olafkfreund/gogmail    # dev shell (python + gog + tools)
+nix flake check github:olafkfreund/gogmail  # build + run the test suite
+```
+
+The packaged app wraps `gog` and the clipboard/browser/image tools onto its
+`PATH`, so it works without installing them separately (a `gog` already on your
+`PATH` still takes precedence).
+
 ## 1. Prerequisites
 
-Before installing GogMail, make sure the `gog` CLI client (`gogcli`) is installed and authenticated. GogMail relies on the `gog` command to interact with Google Workspace APIs.
+GogMail talks to Google Workspace through the `gog` CLI (`gogcli`), which owns
+authentication. Authenticate one or more accounts via the browser OAuth flow:
 
-To authenticate your account via the browser OAuth flow, run:
 ```bash
-gog auth add your-email@example.com --services gmail,calendar,contacts,tasks,drive,chat
+gog auth add your-email@example.com   --services gmail,calendar,contacts,tasks,drive,chat
+gog auth add second-account@gmail.com --services gmail,calendar,contacts,tasks,drive,chat
+gog auth list        # shows all stored accounts
 ```
-Verify that the default account is set and your credentials work:
-```bash
-gog auth list
-gog contacts list
-```
+
+## Using multiple Google accounts
+
+GogMail reads every authenticated account from `gog auth list`. In the app, open
+the **👤 Accounts** node in the sidebar and pick an account to switch — the
+active account is shown in the status bar, persisted to
+`~/.config/gogmail/settings.json`, and every view reloads under it. Set an
+initial account with `defaultAccount`/`$GOG_ACCOUNT`, or leave it unset and the
+app uses the first authenticated account.
 
 ## 2. Incorporating the Flake
 
@@ -62,7 +80,37 @@ programs.gogmail = {
 
 This module will automatically:
 1. Build and install the `gogmail` package globally (making the `gogmail` command available).
-2. Set up global environment variables (`GEMINI_API_KEY`, `GEMINI_MODEL_DEFAULT`, and `GOG_ACCOUNT`).
+2. Set up global environment variables (`GEMINI_MODEL_DEFAULT`, and optionally `GOG_ACCOUNT`).
+
+### Secret-safe API key (recommended)
+
+`geminiApiKey` as a literal string is written to the **world-readable Nix
+store**. Prefer `geminiApiKeyFile`, which is read at runtime via a wrapper:
+
+```nix
+programs.gogmail = {
+  enable = true;
+  geminiApiKeyFile = config.age.secrets.gemini-api-key.path; # agenix/sops
+  defaultModel = "gemini-2.5-flash";
+};
+```
+
+### Home Manager (per-user) module
+
+GogMail is a per-user app (config, themes, active account, API key all live in
+your home). The Home Manager module fits it better than the system module:
+
+```nix
+# flake.nix outputs -> homeConfigurations / HM as a flake module
+imports = [ gogmail.homeManagerModules.default ];
+
+programs.gogmail = {
+  enable = true;
+  geminiApiKeyFile = config.age.secrets.gemini-api-key.path;
+  defaultModel = "gemini-2.5-flash";
+  # defaultAccount left unset → switch accounts in-app
+};
+```
 
 ## 4. Running the Application
 

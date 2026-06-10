@@ -8,7 +8,7 @@ let
 in
 {
   options.programs.gogmail = {
-    enable = mkEnableOption "GogMail TUI client";
+    enable = mkEnableOption "GogMail TUI client (per-user)";
 
     package = mkOption {
       type = types.package;
@@ -33,8 +33,7 @@ in
       default = null;
       description = ''
         Gemini API key as a literal string. NOT secret-safe: it is written to
-        the world-readable Nix store. Prefer geminiApiKeyFile, or use the
-        Home Manager module for per-user secrets.
+        the world-readable Nix store. Prefer geminiApiKeyFile.
       '';
     };
 
@@ -50,14 +49,15 @@ in
       description = ''
         Optional initial Google account ($GOG_ACCOUNT). The app lists all
         authenticated `gog` accounts and can switch between them at runtime, so
-        this only sets the starting account. Leave null when using multiple
-        accounts.
+        this only sets the starting account.
       '';
     };
   };
 
   config = mkIf cfg.enable (
     let
+      # When a key file is provided, wrap the binary so it reads the secret at
+      # runtime instead of baking it into the store.
       finalPackage =
         if cfg.geminiApiKeyFile != null then
           pkgs.symlinkJoin {
@@ -72,9 +72,9 @@ in
         else cfg.package;
     in
     {
-      environment.systemPackages = [ finalPackage ];
+      home.packages = [ finalPackage ];
 
-      environment.sessionVariables = mkMerge [
+      home.sessionVariables = mkMerge [
         { GEMINI_MODEL_DEFAULT = cfg.defaultModel; }
         (mkIf (cfg.geminiApiKey != null) { GEMINI_API_KEY = cfg.geminiApiKey; })
         (mkIf (cfg.defaultAccount != null) { GOG_ACCOUNT = cfg.defaultAccount; })

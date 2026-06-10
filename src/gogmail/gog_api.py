@@ -12,6 +12,11 @@ logging.basicConfig(level=logging.INFO, filename="gogmail.log", filemode="a",
 # sink so the UI can show a real error instead of a silently empty view.
 _error_sink = None
 
+# Active Google account. When set, it is passed to every API command as
+# `-a <email>` so the app can switch between multiple authenticated accounts at
+# runtime. `auth` commands are never account-scoped (we want all accounts).
+_active_account = None
+
 
 class GogError(Exception):
     """Raised by the *_checked helpers when a gog command fails."""
@@ -21,6 +26,16 @@ def set_error_sink(fn) -> None:
     """Register a callback invoked with a human-readable message on any gog failure."""
     global _error_sink
     _error_sink = fn
+
+
+def set_account(email) -> None:
+    """Set the active account applied to subsequent gog API commands."""
+    global _active_account
+    _active_account = email or None
+
+
+def get_account():
+    return _active_account
 
 
 def _report_error(cmd: list[str], err_msg: str) -> None:
@@ -44,6 +59,10 @@ async def run_gog(args: list[str], parse_json: bool = True, quiet: bool = False)
     cmd = ["gog"]
     if parse_json:
         cmd.append("--json")
+    # Scope API commands to the active account (but never `auth`, which lists/
+    # manages all accounts).
+    if _active_account and args and args[0] != "auth":
+        cmd += ["-a", _active_account]
     cmd.extend(args)
 
     def report(msg):
@@ -125,6 +144,14 @@ class GogAPI:
         if not res:
             return False, "`gog` is installed but not authenticated. Run `gog auth login`."
         return True, GogAPI._account_from_status(res)
+
+    @staticmethod
+    async def list_accounts() -> list:
+        """Return the emails of all authenticated gog accounts."""
+        ok, res = await run_gog(["auth", "list"])
+        if ok and isinstance(res, dict):
+            return [a.get("email") for a in res.get("accounts", []) if a.get("email")]
+        return []
 
     @staticmethod
     def _account_from_status(status: dict) -> str:

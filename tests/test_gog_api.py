@@ -92,6 +92,22 @@ class TestGogAPIReads(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(ok)
             self.assertEqual(account, "me@x.com")
 
+    async def test_list_accounts_parses_emails(self):
+        payload = {"accounts": [{"email": "a@x.com"}, {"email": "b@y.com"}, {"no_email": 1}]}
+        with mock.patch.object(gog_api, "run_gog", _fake_run_gog((True, payload))):
+            self.assertEqual(await GogAPI.list_accounts(), ["a@x.com", "b@y.com"])
+
+
+class TestActiveAccount(unittest.TestCase):
+    def tearDown(self):
+        gog_api.set_account(None)
+
+    def test_set_and_get_account(self):
+        gog_api.set_account("a@x.com")
+        self.assertEqual(gog_api.get_account(), "a@x.com")
+        gog_api.set_account("")
+        self.assertIsNone(gog_api.get_account())
+
 
 if __name__ == "__main__":
     unittest.main()
