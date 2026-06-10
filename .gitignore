@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+
+# Nix / devenv
+.devenv/
+.direnv/
+result
+result-*
+
+# Runtime state & logs
+gogmail.log
+settings.json

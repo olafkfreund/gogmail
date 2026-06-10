@@ -1,0 +1,260 @@
+from textual.screen import ModalScreen
+from textual.widgets import Input, Button, Label, TextArea
+from textual.containers import Vertical, Horizontal
+from gogmail.gemini_api import GeminiAPI
+import asyncio
+import os
+import tempfile
+import shutil
+import subprocess
+
+class PromptDialog(ModalScreen):
+    """Generic text input popup dialog."""
+    def __init__(self, title: str, placeholder: str = "", default: str = ""):
+        super().__init__()
+        self.title_text = title
+        self.placeholder = placeholder
+        self.default_val = default
+
+    def compose(self):
+        yield Vertical(
+            Label(self.title_text, classes="dialog-title"),
+            Input(placeholder=self.placeholder, value=self.default_val, id="dialog-input"),
+            Horizontal(
+                Button("OK", variant="primary", id="ok-btn"),
+                Button("Cancel", id="cancel-btn"),
+                classes="btn-row"
+            ),
+            id="dialog-container"
+        )
+
+    def on_mount(self):
+        self.query_one("#dialog-input").focus()
+
+    def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "ok-btn":
+            val = self.query_one("#dialog-input").value
+            self.dismiss(val)
+        else:
+            self.dismiss(None)
+
+class TaskCreateScreen(ModalScreen):
+    """Modal screen for creating a new Google Task."""
+    def __init__(self, tasklist_id: str):
+        super().__init__()
+        self.tasklist_id = tasklist_id
+
+    def compose(self):
+        yield Vertical(
+            Label("Add New Task", classes="dialog-title"),
+            Label("Title:"),
+            Input(placeholder="Task title", id="task-title"),
+            Label("Notes:"),
+            TextArea(id="task-notes", classes="multi-line-input"),
+            Horizontal(
+                Button("Add", variant="success", id="add-btn"),
+                Button("Cancel", id="cancel-btn"),
+                classes="btn-row"
+            ),
+            id="dialog-container"
+        )
+
+    def on_mount(self):
+        self.query_one("#task-title").focus()
+
+    def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "add-btn":
+            title = self.query_one("#task-title").value
+            notes = self.query_one("#task-notes").text
+            self.dismiss({"title": title, "notes": notes})
+        else:
+            self.dismiss(None)
+
+class CalendarCreateScreen(ModalScreen):
+    """Modal screen for creating a Google Calendar event."""
+    def __init__(self, calendar_id: str = "primary"):
+        super().__init__()
+        self.calendar_id = calendar_id
+
+    def compose(self):
+        yield Vertical(
+            Label("Create Calendar Event", classes="dialog-title"),
+            Label("Summary / Title:"),
+            Input(placeholder="Event Title", id="event-summary"),
+            Label("Start Time (RFC3339, e.g. 2026-06-11T10:00:00Z):"),
+            Input(placeholder="2026-06-11T10:00:00Z", id="event-start"),
+            Label("End Time (RFC3339, e.g. 2026-06-11T11:00:00Z):"),
+            Input(placeholder="2026-06-11T11:00:00Z", id="event-end"),
+            Label("Description:"),
+            Input(placeholder="Event description", id="event-desc"),
+            Label("Location:"),
+            Input(placeholder="Event location", id="event-loc"),
+            Horizontal(
+                Button("Create", variant="success", id="create-btn"),
+                Button("Cancel", id="cancel-btn"),
+                classes="btn-row"
+            ),
+            id="dialog-container"
+        )
+
+    def on_mount(self):
+        self.query_one("#event-summary").focus()
+
+    def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "create-btn":
+            summary = self.query_one("#event-summary").value
+            start = self.query_one("#event-start").value
+            end = self.query_one("#event-end").value
+            desc = self.query_one("#event-desc").value
+            loc = self.query_one("#event-loc").value
+            self.dismiss({
+                "summary": summary,
+                "start": start,
+                "end": end,
+                "description": desc,
+                "location": loc
+            })
+        else:
+            self.dismiss(None)
+
+class GmailComposeScreen(ModalScreen):
+    """Modal screen to compose or reply to emails with built-in Gemini drafting."""
+    def __init__(self, to: str = "", subject: str = "", body: str = "", thread_id: str = None, reply_to_message_id: str = None):
+        super().__init__()
+        self.to_default = to
+        self.subject_default = subject
+        self.body_default = body
+        self.thread_id = thread_id
+        self.reply_to_message_id = reply_to_message_id
+
+    def compose(self):
+        title = "Reply to Email" if self.thread_id else "Compose Email"
+        yield Vertical(
+            Label(title, classes="dialog-title"),
+            Label("To:"),
+            Input(value=self.to_default, placeholder="recipient@example.com", id="email-to"),
+            Label("Subject:"),
+            Input(value=self.subject_default, placeholder="Subject", id="email-subject"),
+            Label("Body:"),
+            TextArea(self.body_default, id="email-body"),
+            
+            # Gemini Assistant section
+            Label("Gemini Drafting Assistant:", id="gemini-label"),
+            Input(placeholder="Instructions (e.g. 'draft a polite rejection', 'tell them I am free on Friday')", id="gemini-prompt"),
+            Horizontal(
+                Button("Generate AI Draft", variant="primary", id="ai-draft-btn"),
+                Button("Editor", variant="primary", id="external-editor-btn"),
+                Button("Send", variant="success", id="send-btn"),
+                Button("Cancel", id="cancel-btn"),
+                classes="btn-row"
+            ),
+            id="gmail-compose-container"
+        )
+
+    def on_mount(self):
+        if self.thread_id:
+            self.query_one("#gemini-prompt").focus()
+        else:
+            self.query_one("#email-to").focus()
+
+    async def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "cancel-btn":
+            self.dismiss(None)
+        elif event.button.id == "send-btn":
+            to = self.query_one("#email-to").value
+            subject = self.query_one("#email-subject").value
+            body = self.query_one("#email-body").text
+            self.dismiss({
+                "action": "send",
+                "to": to,
+                "subject": subject,
+                "body": body,
+                "thread_id": self.thread_id,
+                "reply_to_message_id": self.reply_to_message_id
+            })
+        elif event.button.id == "external-editor-btn":
+            body_area = self.query_one("#email-body")
+            initial_text = body_area.text
+            
+            def launch_editor():
+                editor = os.environ.get("EDITOR")
+                if not editor:
+                    for candidate in ["nvim", "vim", "nano", "vi"]:
+                        if shutil.which(candidate):
+                            editor = candidate
+                            break
+                if not editor:
+                    editor = "nano"
+                
+                with tempfile.NamedTemporaryFile(suffix=".txt", delete=False, mode="w", encoding="utf-8") as f:
+                    f.write(initial_text)
+                    temp_path = f.name
+                
+                try:
+                    subprocess.run([editor, temp_path])
+                    with open(temp_path, "r", encoding="utf-8") as f:
+                        return f.read()
+                except Exception:
+                    return initial_text
+                finally:
+                    if os.path.exists(temp_path):
+                        os.remove(temp_path)
+
+            with self.app.suspend():
+                edited_text = launch_editor()
+            
+            body_area.text = edited_text
+        elif event.button.id == "ai-draft-btn":
+            asyncio.create_task(self.generate_ai_draft())
+
+    async def generate_ai_draft(self):
+        user_instructions = self.query_one("#gemini-prompt").value
+        if not user_instructions:
+            return
+        
+        body_area = self.query_one("#email-body")
+        body_area.text = "Generating draft with Gemini..."
+        
+        draft_text = await GeminiAPI.draft_reply(
+            original_subject=self.subject_default,
+            original_sender=self.to_default,
+            original_body=self.body_default,
+            user_instructions=user_instructions
+        )
+        body_area.text = draft_text
+
+    async def on_input_submitted(self, event: Input.Submitted):
+        if event.input.id == "gemini-prompt":
+            asyncio.create_task(self.generate_ai_draft())
+
+
+# Single source of truth for available themes: (key, display label).
+# `key` must match a `.theme-<key>` rule in styles.tcss.
+THEMES = [
+    ("gruvbox", "Gruvbox Dark"),
+    ("catppuccin", "Catppuccin Mocha"),
+    ("nord", "Nord"),
+    ("dracula", "Dracula"),
+    ("monokai", "Monokai"),
+    ("solarized", "Solarized Dark"),
+]
+
+THEME_PREFIX = "theme-btn-"
+
+
+class ThemeSelectScreen(ModalScreen):
+    """Modal screen for selecting app theme."""
+    def compose(self):
+        yield Vertical(
+            Label("Select Theme", classes="dialog-title"),
+            *(Button(label, id=f"{THEME_PREFIX}{key}") for key, label in THEMES),
+            Button("Cancel", id="cancel-btn"),
+            id="dialog-container"
+        )
+
+    def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id and event.button.id.startswith(THEME_PREFIX):
+            # removeprefix (not split) so multi-word theme keys stay intact.
+            self.dismiss(event.button.id.removeprefix(THEME_PREFIX))
+        else:
+            self.dismiss(None)
