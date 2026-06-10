@@ -94,26 +94,29 @@ class TaskCreateScreen(ModalScreen):
             self.dismiss(None)
 
 class CalendarCreateScreen(ModalScreen):
-    """Modal screen for creating a Google Calendar event."""
-    def __init__(self, calendar_id: str = "primary"):
+    """Modal screen for creating or editing a Google Calendar event."""
+    def __init__(self, calendar_id: str = "primary", prefill: dict = None):
         super().__init__()
         self.calendar_id = calendar_id
+        self.prefill = prefill or {}
 
     def compose(self):
+        p = self.prefill
+        editing = bool(p)
         yield Vertical(
-            Label("Create Calendar Event", classes="dialog-title"),
+            Label("Edit Calendar Event" if editing else "Create Calendar Event", classes="dialog-title"),
             Label("Summary / Title:"),
-            Input(placeholder="Event Title", id="event-summary"),
+            Input(value=p.get("summary", ""), placeholder="Event Title", id="event-summary"),
             Label("Start Time (RFC3339, e.g. 2026-06-11T10:00:00Z):"),
-            Input(placeholder="2026-06-11T10:00:00Z", id="event-start"),
+            Input(value=p.get("start", ""), placeholder="2026-06-11T10:00:00Z", id="event-start"),
             Label("End Time (RFC3339, e.g. 2026-06-11T11:00:00Z):"),
-            Input(placeholder="2026-06-11T11:00:00Z", id="event-end"),
+            Input(value=p.get("end", ""), placeholder="2026-06-11T11:00:00Z", id="event-end"),
             Label("Description:"),
-            Input(placeholder="Event description", id="event-desc"),
+            Input(value=p.get("description", ""), placeholder="Event description", id="event-desc"),
             Label("Location:"),
-            Input(placeholder="Event location", id="event-loc"),
+            Input(value=p.get("location", ""), placeholder="Event location", id="event-loc"),
             Horizontal(
-                Button("Create", variant="success", id="create-btn"),
+                Button("Save" if editing else "Create", variant="success", id="create-btn"),
                 Button("Cancel", id="cancel-btn"),
                 classes="btn-row"
             ),

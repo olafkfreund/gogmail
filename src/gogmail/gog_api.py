@@ -273,6 +273,19 @@ class GogAPI:
         return success, _str_result(res)
 
     @staticmethod
+    async def calendar_update_event(calendar_id: str, event_id: str, summary: str = None,
+                                    start_time: str = None, end_time: str = None,
+                                    description: str = None, location: str = None) -> tuple[bool, str]:
+        """Update an event. Only non-None fields are changed."""
+        args = ["calendar", "update", calendar_id, event_id]
+        for flag, value in (("--summary", summary), ("--from", start_time), ("--to", end_time),
+                            ("--description", description), ("--location", location)):
+            if value is not None:
+                args += [flag, value]
+        success, res = await run_gog(args)
+        return success, _str_result(res)
+
+    @staticmethod
     async def calendar_delete_event(calendar_id: str, event_id: str) -> bool:
         success, _ = await run_gog(["calendar", "delete", calendar_id, event_id])
         return success

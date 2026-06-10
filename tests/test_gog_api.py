@@ -146,6 +146,21 @@ class TestGmailLabelsAndDrafts(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(msg, '{"id": "d1"}')
 
 
+class TestCalendarUpdate(unittest.IsolatedAsyncioTestCase):
+    async def test_update_includes_only_set_fields(self):
+        seen = {}
+        async def fake(args, parse_json=True, quiet=False):
+            seen["args"] = args
+            return True, {}
+        with mock.patch.object(gog_api, "run_gog", fake):
+            await GogAPI.calendar_update_event("primary", "E1", summary="New", location="Office")
+        self.assertEqual(seen["args"],
+                         ["calendar", "update", "primary", "E1", "--summary", "New", "--location", "Office"])
+        # start/end/description omitted because they were None
+        self.assertNotIn("--from", seen["args"])
+        self.assertNotIn("--description", seen["args"])
+
+
 class TestDriveActions(unittest.IsolatedAsyncioTestCase):
     async def test_share_builds_args(self):
         seen = {}

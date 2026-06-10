@@ -674,6 +674,30 @@ class GogMailApp(App):
                 )
         self.push_screen(CalendarCreateScreen(), handle_dismiss)
 
+    def open_calendar_edit_dialog(self, ev: dict):
+        start, end = ev.get("start", {}), ev.get("end", {})
+        prefill = {
+            "summary": ev.get("summary", ""),
+            "start": start.get("dateTime") or start.get("date") or "",
+            "end": end.get("dateTime") or end.get("date") or "",
+            "description": ev.get("description", ""),
+            "location": ev.get("location", ""),
+        }
+        event_id = ev.get("id")
+
+        async def handle_dismiss(result):
+            if result:
+                await self._run_mutation(
+                    "Updating event...",
+                    GogAPI.calendar_update_event(
+                        "primary", event_id, summary=result.get("summary"),
+                        start_time=result.get("start"), end_time=result.get("end"),
+                        description=result.get("description"), location=result.get("location")),
+                    "Event updated.",
+                    lambda: self.query_one(CalendarTab).refresh_calendar(),
+                )
+        self.push_screen(CalendarCreateScreen(prefill=prefill), handle_dismiss)
+
     def open_task_create_dialog(self, tasklist_id: str):
         async def handle_dismiss(result):
             if result:

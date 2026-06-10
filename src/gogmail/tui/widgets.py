@@ -539,6 +539,7 @@ class CalendarTab(Vertical):
                 Button("Week", id="cal-view-week", classes="cal-view-toggle"),
                 Button("Day", id="cal-view-day", classes="cal-view-toggle"),
                 Button("Add Event", variant="success", id="cal-add-btn"),
+                Button("Edit Event", variant="primary", id="cal-edit-btn"),
                 Button("Delete Event", variant="error", id="cal-del-btn"),
                 Button("RSVP Yes", id="cal-rsvp-yes"),
                 Button("RSVP No", id="cal-rsvp-no"),
@@ -907,8 +908,11 @@ class CalendarTab(Vertical):
             return
             
         event_id = self.selected_event.get("id")
-        
-        if event.button.id == "cal-del-btn":
+
+        if event.button.id == "cal-edit-btn":
+            self.app.open_calendar_edit_dialog(self.selected_event)
+            return
+        elif event.button.id == "cal-del-btn":
             await GogAPI.calendar_delete_event("primary", event_id)
             self.post_message(StatusNotification("Event deleted."))
             await self.refresh_calendar()
