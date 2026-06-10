@@ -1230,6 +1230,11 @@ class ContactsTab(Vertical):
             id="contacts-header-row"
         )
         yield Horizontal(
+            Button("✉ Email Contact", variant="success", id="contacts-email-btn"),
+            Button("Refresh", id="contacts-ref-btn"),
+            classes="btn-row"
+        )
+        yield Horizontal(
             DataTable(id="contacts-table"),
             RichLog(id="contact-detail", highlight=True, markup=True, wrap=True, min_width=0),
             id="contacts-content-row"
@@ -1263,6 +1268,32 @@ class ContactsTab(Vertical):
     async def on_input_submitted(self, event: Input.Submitted):
         if event.input.id == "contacts-search-input":
             await self.refresh_contacts(event.value)
+
+    def _selected_contact(self) -> dict:
+        table = self.query_one("#contacts-table")
+        if table.cursor_row is None or not getattr(self, "contacts_data", None):
+            return {}
+        res = table.ordered_rows[table.cursor_row].key.value
+        return next(
+            (c for c in self.contacts_data if (c.get("resource") or c.get("resourceName")) == res),
+            {},
+        )
+
+    async def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "contacts-ref-btn":
+            await self.refresh_contacts()
+            return
+        if event.button.id == "contacts-email-btn":
+            contact = self._selected_contact()
+            if not contact:
+                self.post_message(StatusNotification("Select a contact first.", is_error=True))
+                return
+            email = GogAPI.contact_email(contact)
+            if not email:
+                self.post_message(StatusNotification("That contact has no email address.", is_error=True))
+                return
+            name = GogAPI.contact_name(contact)
+            self.app.open_compose_dialog(to=f"{name} <{email}>" if name else email)
 
     async def on_data_table_row_selected(self, event: DataTable.RowSelected):
         res_name = event.row_key.value

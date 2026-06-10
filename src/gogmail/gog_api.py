@@ -378,6 +378,39 @@ class GogAPI:
         return _extract_list(success, res, "contacts", "connections")
 
     @staticmethod
+    def contact_email(contact: dict) -> str:
+        """Primary email for a contact dict (handles flat and nested shapes)."""
+        if contact.get("email"):
+            return contact["email"]
+        for e in contact.get("emailAddresses", []):
+            if e.get("value"):
+                return e["value"]
+        return ""
+
+    @staticmethod
+    def contact_name(contact: dict) -> str:
+        if contact.get("name"):
+            return contact["name"]
+        for n in contact.get("names", []):
+            if n.get("displayName"):
+                return n["displayName"]
+        return ""
+
+    @classmethod
+    async def contact_suggestions(cls) -> list:
+        """Recipient autocomplete entries: 'Name <email>' plus bare emails."""
+        suggestions, seen = [], set()
+        for c in await cls.contacts_list():
+            email = cls.contact_email(c)
+            if not email or email in seen:
+                continue
+            seen.add(email)
+            name = cls.contact_name(c)
+            suggestions.append(f"{name} <{email}>" if name else email)
+            suggestions.append(email)
+        return suggestions
+
+    @staticmethod
     async def people_me() -> dict:
         success, res = await run_gog(["people", "me"])
         return res if success else {}

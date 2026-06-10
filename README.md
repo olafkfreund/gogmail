@@ -51,11 +51,29 @@ python -m gogmail.app
 ## Key Bindings
 
 - `q`: Quit the application.
-- `ctrl + b`: Toggle left sidebar (Workspace Navigator).
-- `alt + a`: Toggle right AI assistant panel.
+- `F2` (or `ctrl + b`): Toggle left sidebar (Workspace Navigator).
+- `F3` (or `alt + a`): Toggle right AI assistant panel.
 - `alt + ←` / `alt + →` (or `alt + h` / `alt + l`): Resize the AI panel.
 - `tab` / `shift + tab`: Move focus between widgets.
+- `↑ / ↓`: Navigate lists, tables, and the sidebar tree.
 - `enter`: Select items (in lists, email tables, etc.) or submit forms/chats.
+
+Everything is fully **keyboard-driven** (Textual handles tab/arrow/enter focus
+and navigation) **and mouse-driven** (click the sidebar, rows, and buttons;
+drag the divider between the content and the AI panel to resize).
+
+## Running in tmux
+
+GogMail works in tmux. Two notes:
+
+- **Mouse:** enable it in your tmux config so clicks/scroll/drag reach the app:
+  ```tmux
+  set -g mouse on
+  ```
+- **Sidebar key:** `ctrl+b` is the default tmux prefix and is swallowed by tmux,
+  so use **`F2`** to toggle the sidebar (and `F3` for the AI panel) inside tmux.
+- **Colors:** use a truecolor terminal; if colors look off, add
+  `set -ga terminal-overrides ",*:Tc"` to your tmux config.
 
 ---
 

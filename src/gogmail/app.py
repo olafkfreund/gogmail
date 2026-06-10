@@ -345,8 +345,12 @@ class GogMailApp(App):
     CSS_PATH = "tui/styles.tcss"
 
     BINDINGS = [
-        Binding("ctrl+b", "toggle_sidebar", "Toggle Sidebar"),
-        Binding("alt+a", "toggle_ai", "Toggle AI Panel"),
+        # F2 is the tmux-safe sidebar toggle (ctrl+b is the default tmux prefix
+        # and never reaches the app inside tmux).
+        Binding("f2", "toggle_sidebar", "Toggle Sidebar"),
+        Binding("ctrl+b", "toggle_sidebar", "Toggle Sidebar", show=False),
+        Binding("f3", "toggle_ai", "Toggle AI"),
+        Binding("alt+a", "toggle_ai", "Toggle AI Panel", show=False),
         Binding("alt+left", "resize_ai('decrease')", "AI Width -"),
         Binding("alt+right", "resize_ai('increase')", "AI Width +"),
         Binding("alt+h", "resize_ai('decrease')", "AI Width -", show=False),

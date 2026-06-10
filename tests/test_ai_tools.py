@@ -130,6 +130,16 @@ class TestGmailThreadFallback(unittest.IsolatedAsyncioTestCase):
         self.assertIn(["gmail", "thread", "get", "THREAD"], calls)
 
 
+class TestContactSuggester(unittest.IsolatedAsyncioTestCase):
+    async def test_case_insensitive_prefix_match(self):
+        from gogmail.tui.screens import ContactSuggester
+        s = ContactSuggester(["Anna Dahl <anna@x.com>", "anna@x.com"])
+        self.assertEqual(await s.get_suggestion("Ann"), "Anna Dahl <anna@x.com>")
+        self.assertEqual(await s.get_suggestion("ann"), "Anna Dahl <anna@x.com>")
+        self.assertIsNone(await s.get_suggestion("zzz"))
+        self.assertIsNone(await s.get_suggestion(""))
+
+
 class TestThemeRegistry(unittest.TestCase):
     def test_valid_themes_match_registry(self):
         self.assertEqual(VALID_THEMES, {key for key, _ in THEMES})

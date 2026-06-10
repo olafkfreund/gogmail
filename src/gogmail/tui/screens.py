@@ -1,8 +1,31 @@
 from textual.screen import ModalScreen
 from textual.widgets import Input, Button, Label, TextArea
 from textual.containers import Vertical, Horizontal
+from textual.suggester import Suggester
 from gogmail.gemini_api import GeminiAPI
+from gogmail.gog_api import GogAPI
 import asyncio
+
+
+class ContactSuggester(Suggester):
+    """Case-insensitive prefix autocomplete for recipient addresses.
+
+    (Textual's SuggestFromList compares the typed value case-sensitively even
+    when case_sensitive=False, so an uppercase first letter never matches a
+    lowercased option — this does the matching explicitly.)
+    """
+    def __init__(self, options):
+        super().__init__(use_cache=False, case_sensitive=True)
+        self._options = list(options)
+
+    async def get_suggestion(self, value: str):
+        v = value.lower()
+        if not v:
+            return None
+        for opt in self._options:
+            if opt.lower().startswith(v):
+                return opt
+        return None
 import os
 import tempfile
 import shutil
@@ -156,6 +179,16 @@ class GmailComposeScreen(ModalScreen):
             self.query_one("#gemini-prompt").focus()
         else:
             self.query_one("#email-to").focus()
+        # Populate recipient autocomplete from the address book in the background.
+        self.run_worker(self._load_recipient_suggestions(), exclusive=True)
+
+    async def _load_recipient_suggestions(self):
+        try:
+            suggestions = await GogAPI.contact_suggestions()
+        except Exception:
+            return
+        if suggestions:
+            self.query_one("#email-to", Input).suggester = ContactSuggester(suggestions)
 
     async def on_button_pressed(self, event: Button.Pressed):
         if event.button.id == "cancel-btn":

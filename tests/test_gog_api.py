@@ -98,6 +98,32 @@ class TestGogAPIReads(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(await GogAPI.list_accounts(), ["a@x.com", "b@y.com"])
 
 
+class TestContacts(unittest.TestCase):
+    def test_contact_email_flat_and_nested(self):
+        self.assertEqual(GogAPI.contact_email({"email": "a@x.com"}), "a@x.com")
+        self.assertEqual(GogAPI.contact_email({"emailAddresses": [{"value": "b@y.com"}]}), "b@y.com")
+        self.assertEqual(GogAPI.contact_email({"phone": "123"}), "")
+
+    def test_contact_name(self):
+        self.assertEqual(GogAPI.contact_name({"name": "Bob"}), "Bob")
+        self.assertEqual(GogAPI.contact_name({"names": [{"displayName": "Al"}]}), "Al")
+
+
+class TestContactSuggestions(unittest.IsolatedAsyncioTestCase):
+    async def test_suggestions_skip_emailless_and_dedupe(self):
+        payload = {"contacts": [
+            {"name": "Anna", "email": "anna@x.com"},
+            {"name": "NoMail", "phone": "555"},
+            {"name": "Anna2", "email": "anna@x.com"},  # dup email
+        ]}
+        with mock.patch.object(gog_api, "run_gog", _fake_run_gog((True, payload))):
+            sugs = await GogAPI.contact_suggestions()
+        self.assertIn("Anna <anna@x.com>", sugs)
+        self.assertIn("anna@x.com", sugs)
+        self.assertEqual(sugs.count("anna@x.com"), 1)  # deduped
+        self.assertFalse(any("NoMail" in s for s in sugs))
+
+
 class TestActiveAccount(unittest.TestCase):
     def tearDown(self):
         gog_api.set_account(None)
