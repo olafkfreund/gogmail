@@ -18,6 +18,7 @@ from datetime import datetime, date, timedelta
 from html.parser import HTMLParser
 from urllib.parse import urlparse
 from rich.text import Text
+from rich.markup import escape as rich_escape
 
 class TUIHTMLParser(HTMLParser):
     def __init__(self):
@@ -67,10 +68,11 @@ class TUIHTMLParser(HTMLParser):
             alt = alt.strip()
             if not alt:
                 alt = 'Image'
+            placeholder = rich_escape(f"[🖼️  {alt}]")
             if self.current_link:
-                self.text.append(f"\n[link={self.current_link}][🖼️  {alt}][/link]\n")
+                self.text.append(f"\n[link={self.current_link}]{placeholder}[/link]\n")
             else:
-                self.text.append(f"\n[🖼️  {alt}]\n")
+                self.text.append(f"\n{placeholder}\n")
         elif tag == 'li':
             self.text.append('\n  • ')
 
@@ -94,14 +96,11 @@ class TUIHTMLParser(HTMLParser):
                 link_str = "".join(self.link_text).strip()
                 link_str = clean_text_entities(link_str)
                 if link_str:
-                    escaped_link = link_str.replace('[', '[[').replace(']', ']]')
-                    current_link_escaped = self.current_link.replace('[', '[[').replace(']', ']]')
-                    
-                    if escaped_link.lower() == current_link_escaped.lower() or escaped_link.startswith("http") or len(escaped_link) > 50:
-                        display_text = clean_url_display(escaped_link)
+                    if link_str.lower() == self.current_link.lower() or link_str.startswith("http") or len(link_str) > 50:
+                        display_text = clean_url_display(link_str)
                     else:
-                        display_text = escaped_link
-                        
+                        display_text = link_str
+                    display_text = rich_escape(display_text)
                     self.text.append(f"[link={self.current_link}][underline blue]{display_text}[/underline blue][/link]")
             self.current_link = None
             self.link_text = []
@@ -114,9 +113,9 @@ class TUIHTMLParser(HTMLParser):
                 cleaned = clean_text_entities(data)
                 cleaned = re.sub(r'[ \t\r\f]+', ' ', cleaned)
                 if cleaned:
-                    escaped = cleaned.replace('[', '[[')
-                    escaped = escaped.replace(']', ']]')
-                    self.text.append(escaped)
+                    # Escape so user content can't break the Rich markup we emit
+                    # (an stray "[/x]" would otherwise raise MarkupError on render).
+                    self.text.append(rich_escape(cleaned))
 
     def get_text(self):
         content = "".join(self.text)
@@ -398,12 +397,22 @@ class GmailTab(Vertical):
 
         if msg:
             headers = msg.get("headers", {})
-            body_view.write(f"[bold magenta]From:[/bold magenta] {headers.get('from', '')}")
-            body_view.write(f"[bold magenta]Subject:[/bold magenta] {headers.get('subject', '')}")
-            body_view.write(f"[bold magenta]Date:[/bold magenta] {headers.get('date', '')}")
+            # Escape header values: a subject/sender containing "[...]" would
+            # otherwise be parsed as Rich markup and could raise MarkupError.
+            body_view.write(f"[bold magenta]From:[/bold magenta] {rich_escape(headers.get('from', ''))}")
+            body_view.write(f"[bold magenta]Subject:[/bold magenta] {rich_escape(headers.get('subject', ''))}")
+            body_view.write(f"[bold magenta]Date:[/bold magenta] {rich_escape(headers.get('date', ''))}")
             body_view.write("-" * 40 + "\n")
             rendered = best_email_text(msg)
-            body_view.write(rendered if rendered.strip() else "[dim](This email has no readable text content.)[/dim]")
+            if not rendered.strip():
+                body_view.write("[dim](This email has no readable text content.)[/dim]")
+            else:
+                try:
+                    body_view.write(rendered)
+                except Exception:
+                    # Last-resort safety net: render literally so a stray bracket
+                    # can never leave the body blank.
+                    body_view.write(Text(rendered))
 
             # Auto-mark read in background
             await GogAPI.gmail_mark_read(thread_id)

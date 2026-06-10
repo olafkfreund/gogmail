@@ -84,6 +84,22 @@ class TestHtmlRendering(unittest.TestCase):
         )
         self.assertIn("Visible content here", format_email_body(html))
 
+    def test_output_never_raises_rich_markup_error(self):
+        # Regression: email content like "[/x]" used to be emitted unescaped and
+        # raised MarkupError on render, blanking the email body.
+        import io
+        from rich.console import Console
+        from gogmail.tui.widgets import format_email_body
+        adversarial = (
+            '<html><body><p>Deal [/x] and [bold] [unclosed text</p>'
+            '<a href="http://x.com">[click here]</a>'
+            '<img alt="[/img] logo"></body></html>'
+        )
+        out = format_email_body(adversarial)
+        console = Console(file=io.StringIO(), markup=True, width=100)
+        console.print(out)  # must not raise MarkupError
+        self.assertIn("Deal", out)
+
     def test_strip_html_to_text_fallback(self):
         from gogmail.tui.widgets import strip_html_to_text
         out = strip_html_to_text("<div>Hello <b>world</b></div><script>x()</script>")
