@@ -930,6 +930,9 @@ class DriveTab(Vertical):
         yield Horizontal(
             Button("New Folder", variant="success", id="drive-mkdir-btn"),
             Button("View", variant="primary", id="drive-view-btn"),
+            Button("Share", variant="primary", id="drive-share-btn"),
+            Button("Rename", variant="primary", id="drive-rename-btn"),
+            Button("Move", variant="primary", id="drive-move-btn"),
             Button("Download", id="drive-dl-btn"),
             Button("Upload File", id="drive-up-btn"),
             Button("Delete", variant="error", id="drive-del-btn"),
@@ -998,7 +1001,13 @@ class DriveTab(Vertical):
         file_id = table.ordered_rows[selected_row_idx].key.value
         file_name = self.files_data[selected_row_idx].get("name")
         
-        if event.button.id == "drive-dl-btn":
+        if event.button.id == "drive-share-btn":
+            self.app.open_drive_share_dialog(file_id, file_name)
+        elif event.button.id == "drive-rename-btn":
+            self.app.open_drive_rename_dialog(file_id, file_name)
+        elif event.button.id == "drive-move-btn":
+            self.app.open_drive_move_dialog(file_id, file_name)
+        elif event.button.id == "drive-dl-btn":
             self.app.open_drive_download_dialog(file_id, file_name)
         elif event.button.id == "drive-view-btn":
             self.post_message(StatusNotification(f"Downloading {file_name} for preview..."))

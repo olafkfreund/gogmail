@@ -717,6 +717,31 @@ class GogMailApp(App):
             default=f"/tmp/{file_name}",
         )
 
+    def open_drive_share_dialog(self, file_id, file_name):
+        self._open_prompt(
+            f"Share “{file_name}”", "Recipient email (shared as viewer)",
+            lambda v: GogAPI.drive_share(file_id, v, role="reader", notify=True),
+            "Sharing...", "Shared.",
+            lambda: self.query_one(DriveTab).refresh_files(),
+        )
+
+    def open_drive_rename_dialog(self, file_id, file_name):
+        self._open_prompt(
+            "Rename file", "New name",
+            lambda v: GogAPI.drive_rename(file_id, v),
+            "Renaming...", "Renamed.",
+            lambda: self.query_one(DriveTab).refresh_files(),
+            default=file_name or "",
+        )
+
+    def open_drive_move_dialog(self, file_id, file_name):
+        self._open_prompt(
+            f"Move “{file_name}”", "Destination folder ID",
+            lambda v: GogAPI.drive_move(file_id, v),
+            "Moving...", "Moved.",
+            lambda: self.query_one(DriveTab).refresh_files(),
+        )
+
     def open_doc_create_dialog(self):
         self._open_prompt(
             "Create Google Doc", "Enter document title",

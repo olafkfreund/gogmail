@@ -317,6 +317,24 @@ class GogAPI:
         success, res = await run_gog(["drive", "mkdir", name])
         return success, _str_result(res)
 
+    @staticmethod
+    async def drive_share(file_id: str, email: str, role: str = "reader", notify: bool = False) -> tuple[bool, str]:
+        args = ["drive", "share", file_id, "--to", "user", "--email", email, "--role", role]
+        if notify:
+            args.append("--notify")
+        success, res = await run_gog(args)
+        return success, _str_result(res)
+
+    @staticmethod
+    async def drive_rename(file_id: str, new_name: str) -> tuple[bool, str]:
+        success, res = await run_gog(["drive", "rename", file_id, new_name])
+        return success, _str_result(res)
+
+    @staticmethod
+    async def drive_move(file_id: str, parent_id: str) -> tuple[bool, str]:
+        success, res = await run_gog(["drive", "move", file_id, "--parent", parent_id])
+        return success, _str_result(res)
+
     # --- Docs ---
     @staticmethod
     async def docs_cat(doc_id: str) -> str:

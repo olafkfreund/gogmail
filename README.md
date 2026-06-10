@@ -14,9 +14,9 @@ A modern, premium, feature-rich Terminal User Interface (TUI) client for Linux t
 ## Key Features
 
 - **Integrated Services**: Contains specialized dashboards for:
-  - **Gmail**: Read, search, archive, trash, compose, and reply.
+  - **Gmail**: Read, search, archive, trash, compose, reply, **star, apply labels, and save drafts**; recipient autocomplete from contacts.
   - **Calendar**: Agenda view, details panel, RSVP responses, create and delete events.
-  - **Drive**: Browse, search, upload, download, create folders, and delete.
+  - **Drive**: Browse, search, upload, download, create folders, delete, **share, rename, and move**; click a file to open it in the browser.
   - **Docs, Sheets, Slides, Forms**: Interactive lists, read/cat Docs, render Sheets inside a grid/table, create new documents/spreadsheets/presentations/forms.
   - **Meet**: Instantly create video conference spaces and copy links.
   - **Zoom**: Validate Server-to-Server OAuth configuration.

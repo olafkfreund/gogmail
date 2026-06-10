@@ -146,6 +146,24 @@ class TestGmailLabelsAndDrafts(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(msg, '{"id": "d1"}')
 
 
+class TestDriveActions(unittest.IsolatedAsyncioTestCase):
+    async def test_share_builds_args(self):
+        seen = {}
+        async def fake(args, parse_json=True, quiet=False):
+            seen["args"] = args
+            return True, {}
+        with mock.patch.object(gog_api, "run_gog", fake):
+            ok, _ = await GogAPI.drive_share("F1", "a@x.com", role="writer", notify=True)
+        self.assertTrue(ok)
+        self.assertEqual(seen["args"],
+                         ["drive", "share", "F1", "--to", "user", "--email", "a@x.com", "--role", "writer", "--notify"])
+
+    async def test_rename_and_move(self):
+        with mock.patch.object(gog_api, "run_gog", _fake_run_gog((True, {}))):
+            self.assertTrue((await GogAPI.drive_rename("F1", "new"))[0])
+            self.assertTrue((await GogAPI.drive_move("F1", "PARENT"))[0])
+
+
 class TestActiveAccount(unittest.TestCase):
     def tearDown(self):
         gog_api.set_account(None)
