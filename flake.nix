@@ -39,7 +39,9 @@
           doCheck = true;
           checkPhase = ''
             runHook preCheck
-            PYTHONPATH=$PWD/src ${python.interpreter} -m unittest discover -s tests -v
+            # Use the build env's python (which has textual/requests/rich on
+            # PYTHONPATH); prepend src rather than overriding PYTHONPATH.
+            PYTHONPATH=$PWD/src:$PYTHONPATH python -m unittest discover -s tests -v
             runHook postCheck
           '';
 

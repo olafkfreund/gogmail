@@ -1,0 +1,116 @@
+---
+layout: default
+---
+
+<section class="hero" style="border-bottom: none;">
+  <div class="wrap">
+    <h1><span class="accent">Gog</span>Mail <span class="accent">TUI</span></h1>
+    <p class="lead">Your entire Google Workspace — Gmail, Calendar, Drive, Docs, Tasks,
+    Contacts and Chat — plus a context-aware Gemini assistant, in a fast,
+    keyboard-driven terminal app.</p>
+    <div class="badges">
+      <span class="badge">Python · Textual</span>
+      <span class="badge">gog CLI</span>
+      <span class="badge">Gemini</span>
+      <span class="badge">Nix flake</span>
+      <span class="badge">6 themes</span>
+      <span class="badge">tmux-friendly</span>
+    </div>
+    <div>
+      <a class="btn btn-primary" href="{{ site.repo_url }}">View on GitHub</a>
+      <a class="btn btn-ghost" href="{{ '/#screenshots' | relative_url }}">See it in action</a>
+      <a class="btn btn-ghost" href="{{ '/blog/' | relative_url }}">Read the build story</a>
+    </div>
+  </div>
+</section>
+
+<section id="what">
+  <div class="wrap">
+    <h2>What it is</h2>
+    <p class="section-sub">One terminal window for everything Google Workspace.</p>
+    <p>GogMail is a <b>Terminal User Interface</b> built with
+    <a href="https://textual.textualize.io/">Textual</a>. It never touches Google
+    APIs directly — every action flows through the local
+    <a href="https://github.com/steino/gogcli"><code>gog</code> CLI</a>, which owns
+    authentication, while a side panel talks to <b>Gemini</b> for summaries,
+    drafting and tool-calling. A tree sidebar on the left, a content pane in the
+    middle, and an AI drawer on the right — all navigable by keyboard or mouse.</p>
+  </div>
+</section>
+
+<section id="features">
+  <div class="wrap">
+    <h2>Features</h2>
+    <p class="section-sub">Every Workspace service, one consistent interface.</p>
+    <div class="grid">
+      <div class="card"><div class="ico">✉️</div><h3>Gmail</h3><p>Read, search (full Gmail query syntax), compose, reply, archive, trash. HTML emails rendered to clean text, with a plain-text fallback so nothing shows blank.</p></div>
+      <div class="card"><div class="ico">📅</div><h3>Calendar</h3><p>Month, week and day views with a details panel. Create and delete events, RSVP, and see Google Tasks alongside your agenda.</p></div>
+      <div class="card"><div class="ico">📁</div><h3>Drive</h3><p>Browse and search files, upload, download, make folders. Click a file to open it in the browser — Docs/Sheets/Slides land in their editors.</p></div>
+      <div class="card"><div class="ico">📝</div><h3>Docs · Sheets · Slides · Forms</h3><p>List and open documents, read Docs inline, render Sheets in a grid, and create new files from a single shared tab base.</p></div>
+      <div class="card"><div class="ico">✓</div><h3>Tasks</h3><p>Multiple task lists, complete/uncomplete, add and delete — kept in sync with the calendar.</p></div>
+      <div class="card"><div class="ico">👤</div><h3>Contacts</h3><p>Fast directory search, a details card, and a one-key “Email Contact” that opens Compose pre-filled.</p></div>
+      <div class="card"><div class="ico">💬</div><h3>Meet · Zoom · Chat</h3><p>Spin up a Meet space, validate Zoom OAuth, and read/post in Google Chat spaces.</p></div>
+      <div class="card"><div class="ico">🤖</div><h3>Gemini assistant</h3><p>Context-aware: it sees the selected email, open doc, or task list. Ask it to summarize or draft — or let it call tools (send, search, create) for you.</p></div>
+      <div class="card"><div class="ico">🪪</div><h3>Multiple accounts</h3><p>Switch between every authenticated Google account from the sidebar; the choice persists and every view reloads under it.</p></div>
+      <div class="card"><div class="ico">🎨</div><h3>Six themes</h3><p>Gruvbox, Catppuccin, Nord, Dracula, Monokai, Solarized — switched live and remembered.</p></div>
+      <div class="card"><div class="ico">⌨️</div><h3>Keyboard &amp; mouse</h3><p>Full tab/arrow/enter navigation and clickable everything. tmux-friendly key bindings (F2/F3) and a draggable AI panel.</p></div>
+      <div class="card"><div class="ico">❄️</div><h3>Nix-native</h3><p>A flake with <code>nix run</code>, <code>nix develop</code>, and <code>nix flake check</code>, plus NixOS and Home Manager modules with secret-safe API keys.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="why">
+  <div class="wrap">
+    <h2>Why &amp; how it was built</h2>
+    <p class="section-sub">A terminal-first power user who lives in tmux shouldn't have to leave it for email.</p>
+    <p><b>The why:</b> webmail is heavy and context-switching is expensive. If you
+    already run your editor, shell and tools in the terminal, your inbox, calendar
+    and tasks should be one keystroke away — fast, themeable, and scriptable on top
+    of a CLI that already handles Google auth.</p>
+    <p style="margin-top:1.5rem;"><b>The how:</b> the whole thing was designed,
+    debugged and hardened in collaboration with <a href="https://claude.com/claude-code">Claude Code</a>,
+    following a tight plan → act → reflect loop:</p>
+    <div class="steps" style="margin-top:1.5rem;">
+      <div class="step"><div class="num"></div><div class="body"><h3>Thin, layered architecture</h3><p>A <code>GogAPI</code> wrapper over <code>gog --json</code>, per-service Textual tabs, and an app shell — each layer mockable and testable in isolation.</p></div></div>
+      <div class="step"><div class="num"></div><div class="body"><h3>Reliability first</h3><p>Every <code>gog</code> failure surfaces as a toast instead of an empty screen; a startup preflight checks auth; emails never render blank thanks to layered HTML→text fallbacks.</p></div></div>
+      <div class="step"><div class="num"></div><div class="body"><h3>Verified against real data</h3><p>Bugs were reproduced and fixed by rendering the actual UI headlessly to screenshots and replaying real mailbox data — not guesswork.</p></div></div>
+      <div class="step"><div class="num"></div><div class="body"><h3>Tested &amp; packaged</h3><p>A stdlib <code>unittest</code> suite wired into <code>nix flake check</code>, and a flake that wraps the <code>gog</code> CLI and tools onto PATH so it just works.</p></div></div>
+    </div>
+    <p style="margin-top:1.5rem;">The full story — including the bugs and how we hunted
+    them — is in the <a href="{{ '/blog/' | relative_url }}">blog</a>.</p>
+  </div>
+</section>
+
+<section id="screenshots">
+  <div class="wrap">
+    <h2>Screenshots</h2>
+    <p class="section-sub">Gruvbox Dark, the default theme.</p>
+    <div class="shots">
+      {% assign shots = "inbox|Gmail inbox + Gemini panel,sent|Sent mail,calendar-month|Calendar · month view,calendar-week|Calendar · week view,calendar-day|Calendar · day view,drive|Google Drive files,docs|Google Docs,slides|Google Slides,tasks-detail|Google Tasks,contacts|Contacts directory,chat|Google Chat spaces,themes|Theme picker (6 themes)" | split: "," %}
+      {% for s in shots %}
+        {% assign parts = s | split: "|" %}
+        <figure class="shot">
+          <img src="{{ '/assets/img/' | append: parts[0] | append: '.png' | relative_url }}" alt="{{ parts[1] }}" loading="lazy">
+          <figcaption class="cap"><b>{{ parts[1] }}</b></figcaption>
+        </figure>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<section id="get-started">
+  <div class="wrap">
+    <h2>Get started</h2>
+    <p class="section-sub">You need the <code>gog</code> CLI authenticated and a Gemini API key.</p>
+    <pre><code># authenticate one or more Google accounts
+gog auth add you@example.com --services gmail,calendar,contacts,tasks,drive,chat
+export GEMINI_API_KEY=AIza...
+
+# run it
+nix run github:olafkfreund/gogmail
+# …or from a clone:
+just run</code></pre>
+    <p>NixOS and Home Manager modules, multi-account setup, and secret-safe key
+    handling are documented in the repo’s <a href="{{ site.repo_url }}/blob/main/nixos_install.md">install guide</a>.</p>
+  </div>
+</section>

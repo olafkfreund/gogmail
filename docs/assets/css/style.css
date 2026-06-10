@@ -1,0 +1,186 @@
+/* ===== Gruvbox Dark palette ===== */
+:root {
+  --bg0-hard: #1d2021;
+  --bg0: #282828;
+  --bg1: #3c3836;
+  --bg2: #504945;
+  --bg3: #665c54;
+  --fg: #ebdbb2;
+  --fg-dim: #a89984;
+  --gray: #928374;
+  --red: #fb4934;
+  --green: #b8bb26;
+  --yellow: #fabd2f;
+  --blue: #83a598;
+  --purple: #d3869b;
+  --aqua: #8ec07c;
+  --orange: #fe8019;
+}
+
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  background: var(--bg0);
+  color: var(--fg);
+  font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  line-height: 1.65;
+  font-size: 17px;
+}
+
+a { color: var(--yellow); text-decoration: none; }
+a:hover { color: var(--orange); text-decoration: underline; }
+
+code, pre, .mono {
+  font-family: "JetBrains Mono", "Fira Code", ui-monospace, "Cascadia Code", monospace;
+}
+
+code {
+  background: var(--bg0-hard);
+  color: var(--aqua);
+  padding: 0.12em 0.4em;
+  border-radius: 4px;
+  font-size: 0.88em;
+}
+
+pre {
+  background: var(--bg0-hard);
+  border: 1px solid var(--bg2);
+  border-left: 3px solid var(--yellow);
+  border-radius: 8px;
+  padding: 1rem 1.2rem;
+  overflow-x: auto;
+}
+pre code { background: none; color: var(--fg); padding: 0; }
+
+/* ===== Layout ===== */
+.wrap { max-width: 1000px; margin: 0 auto; padding: 0 1.25rem; }
+
+.site-header {
+  position: sticky; top: 0; z-index: 10;
+  background: rgba(29, 32, 33, 0.92);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--bg2);
+}
+.site-header .wrap {
+  display: flex; align-items: center; justify-content: space-between;
+  height: 60px;
+}
+.brand { font-family: "JetBrains Mono", monospace; font-weight: 700; font-size: 1.15rem; color: var(--yellow); }
+.brand .tilde { color: var(--green); }
+.nav a { color: var(--fg-dim); margin-left: 1.4rem; font-size: 0.95rem; }
+.nav a:hover { color: var(--yellow); text-decoration: none; }
+
+/* ===== Hero ===== */
+.hero {
+  text-align: center;
+  padding: 4.5rem 1rem 3rem;
+  background:
+    radial-gradient(900px 400px at 50% -10%, rgba(250,189,47,0.10), transparent 70%),
+    var(--bg0);
+  border-bottom: 1px solid var(--bg1);
+}
+.hero h1 {
+  font-family: "JetBrains Mono", monospace;
+  font-size: clamp(2.1rem, 5vw, 3.4rem);
+  margin: 0 0 0.6rem;
+  color: var(--fg);
+}
+.hero h1 .accent { color: var(--yellow); }
+.hero p.lead { font-size: 1.25rem; color: var(--fg-dim); max-width: 680px; margin: 0 auto 1.8rem; }
+
+.badges { margin: 1rem 0 1.6rem; }
+.badge {
+  display: inline-block; font-family: "JetBrains Mono", monospace; font-size: 0.8rem;
+  background: var(--bg1); color: var(--aqua); border: 1px solid var(--bg2);
+  border-radius: 999px; padding: 0.25rem 0.8rem; margin: 0.2rem;
+}
+
+.btn {
+  display: inline-block; font-weight: 600; border-radius: 8px;
+  padding: 0.7rem 1.4rem; margin: 0.3rem; transition: transform .08s ease;
+}
+.btn:hover { text-decoration: none; transform: translateY(-2px); }
+.btn-primary { background: var(--yellow); color: var(--bg0-hard); }
+.btn-primary:hover { background: var(--orange); color: var(--bg0-hard); }
+.btn-ghost { background: transparent; color: var(--fg); border: 1px solid var(--bg3); }
+.btn-ghost:hover { border-color: var(--yellow); color: var(--yellow); }
+
+/* ===== Sections ===== */
+section { padding: 3rem 0; border-bottom: 1px solid var(--bg1); }
+section h2 {
+  font-family: "JetBrains Mono", monospace; font-size: 1.8rem; color: var(--orange);
+  margin-top: 0; margin-bottom: 0.4rem;
+}
+section h2::before { content: "## "; color: var(--bg3); }
+.section-sub { color: var(--fg-dim); margin-top: 0; margin-bottom: 2rem; }
+
+/* feature grid */
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.1rem; }
+.card {
+  background: var(--bg0-hard); border: 1px solid var(--bg2);
+  border-radius: 10px; padding: 1.3rem;
+}
+.card:hover { border-color: var(--bg3); }
+.card .ico { font-size: 1.5rem; }
+.card h3 { margin: 0.4rem 0 0.4rem; color: var(--yellow); font-size: 1.1rem; }
+.card p { margin: 0; color: var(--fg-dim); font-size: 0.95rem; }
+
+/* screenshot gallery */
+.shots { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.3rem; }
+.shot {
+  background: var(--bg0-hard); border: 1px solid var(--bg2); border-radius: 10px;
+  overflow: hidden;
+}
+.shot img { width: 100%; display: block; border-bottom: 1px solid var(--bg2); }
+.shot .cap { padding: 0.7rem 1rem; }
+.shot .cap b { color: var(--yellow); }
+.shot .cap span { display: block; color: var(--fg-dim); font-size: 0.88rem; }
+
+/* why / steps */
+.steps { counter-reset: step; }
+.step { display: flex; gap: 1rem; margin-bottom: 1.2rem; }
+.step .num {
+  counter-increment: step; flex: 0 0 auto;
+  width: 2rem; height: 2rem; border-radius: 50%;
+  background: var(--bg1); color: var(--yellow); border: 1px solid var(--bg3);
+  display: grid; place-items: center; font-family: "JetBrains Mono", monospace; font-weight: 700;
+}
+.step .num::before { content: counter(step); }
+.step .body h3 { margin: 0.1rem 0 0.2rem; color: var(--fg); font-size: 1.05rem; }
+.step .body p { margin: 0; color: var(--fg-dim); }
+
+/* blog list */
+.posts { list-style: none; padding: 0; }
+.posts li { padding: 1.1rem 0; border-bottom: 1px solid var(--bg1); }
+.posts .date { font-family: "JetBrains Mono", monospace; color: var(--gray); font-size: 0.85rem; }
+.posts h3 { margin: 0.2rem 0; }
+.posts p { margin: 0.2rem 0 0; color: var(--fg-dim); }
+
+/* post body */
+.post { padding: 2.5rem 0; }
+.post .meta { color: var(--gray); font-family: "JetBrains Mono", monospace; font-size: 0.85rem; }
+.post h1 { color: var(--fg); margin: 0.2rem 0 0.6rem; }
+.post h2 { color: var(--orange); margin-top: 2rem; }
+.post h3 { color: var(--yellow); }
+.post img { max-width: 100%; border: 1px solid var(--bg2); border-radius: 8px; }
+.post blockquote {
+  margin: 1.2rem 0; padding: 0.6rem 1rem; border-left: 3px solid var(--aqua);
+  background: var(--bg0-hard); color: var(--fg-dim);
+}
+.post ul, .post ol { color: var(--fg); }
+
+/* footer */
+.site-footer {
+  padding: 2rem 0; text-align: center; color: var(--gray); font-size: 0.9rem;
+}
+.site-footer .mono { color: var(--green); }
+
+hr { border: none; border-top: 1px solid var(--bg2); margin: 2rem 0; }
+
+@media (max-width: 600px) {
+  .nav a { margin-left: 0.9rem; font-size: 0.85rem; }
+  body { font-size: 16px; }
+}

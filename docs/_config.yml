@@ -1,0 +1,32 @@
+title: GogMail TUI
+tagline: Google Workspace in your terminal
+description: >-
+  A keyboard- and mouse-driven Google Workspace client for the terminal —
+  Gmail, Calendar, Drive, Tasks, Contacts, Chat and a context-aware Gemini
+  assistant, built on the gog CLI. Designed, debugged, and documented with
+  Claude Code.
+
+# Project page served from /docs on the main branch.
+# If you fork to a different repo name, change baseurl to match.
+url: "https://olafkfreund.github.io"
+baseurl: "/gogmail"
+
+author: olafkfreund
+github_username: olafkfreund
+repo_url: "https://github.com/olafkfreund/gogmail"
+
+markdown: kramdown
+permalink: /blog/:title/
+
+# We ship our own Gruvbox Dark layouts/CSS, so no gem theme.
+theme: null
+plugins: []
+
+defaults:
+  - scope: { path: "", type: "posts" }
+    values: { layout: "post" }
+
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - vendor
