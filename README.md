@@ -1,6 +1,15 @@
 # GogMail TUI
 
+[![CI](https://github.com/olafkfreund/gogmail/actions/workflows/ci.yml/badge.svg)](https://github.com/olafkfreund/gogmail/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-fabd2f.svg)](LICENSE)
+[![Showcase](https://img.shields.io/badge/showcase-olafkfreund.github.io%2Fgogmail-fe8019)](https://olafkfreund.github.io/gogmail/)
+[![Built with Claude Code](https://img.shields.io/badge/built%20with-Claude%20Code-b8bb26)](https://claude.com/claude-code)
+
 A modern, premium, feature-rich Terminal User Interface (TUI) client for Linux that brings Google Workspace and Zoom services directly into your terminal.
+
+**🌐 Showcase & blog: [olafkfreund.github.io/gogmail](https://olafkfreund.github.io/gogmail/)**
+
+![GogMail inbox](docs/assets/img/inbox.png)
 
 ## Key Features
 
