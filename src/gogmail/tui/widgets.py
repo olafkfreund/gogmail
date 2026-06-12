@@ -349,10 +349,10 @@ class GmailTab(Vertical):
             # 2. Detail View
             with Vertical(id="gmail-detail-view"):
                 yield Horizontal(
-                    Button("⬅ Back", variant="primary", id="gmail-back-btn"),
+                    Button("← Back", variant="primary", id="gmail-back-btn"),
                     Button("Reply", variant="success", id="gmail-reply-btn"),
-                    Button("★ Star", variant="primary", id="gmail-star-btn"),
-                    Button("🏷 Label", variant="primary", id="gmail-label-btn"),
+                    Button("Star", variant="primary", id="gmail-star-btn"),
+                    Button("Label", variant="primary", id="gmail-label-btn"),
                     Button("Archive", variant="primary", id="gmail-archive-btn"),
                     Button("Trash", variant="error", id="gmail-trash-btn"),
                     Button("AI Summary", variant="primary", id="gmail-summary-btn"),
@@ -705,9 +705,9 @@ class CalendarTab(Vertical):
                         
                     for t in day_tasks:
                         if count >= 4:
-                            cell_content.append("✔ ...\n", style="yellow")
+                            cell_content.append("✓ ...\n", style="yellow")
                             break
-                        status = "✔" if t.get("status") == "completed" else "☐"
+                        status = "✓" if t.get("status") == "completed" else "○"
                         cell_content.append(f"{status} {t.get('title', '')[:10]}\n", style="yellow")
                         count += 1
                         
@@ -738,7 +738,7 @@ class CalendarTab(Vertical):
                 for e in all_day_events:
                     cell_text.append(f"• {e.get('summary', '(No Title)')[:12]}\n", style="green")
                 for t in tasks:
-                    status = "✔" if t.get("status") == "completed" else "☐"
+                    status = "✓" if t.get("status") == "completed" else "○"
                     cell_text.append(f"{status} {t.get('title', '')[:10]}\n", style="yellow")
                 row_cells.append(cell_text)
             table.add_row(*row_cells, height=None)
@@ -777,7 +777,7 @@ class CalendarTab(Vertical):
             for e in all_day_events:
                 cell_text.append(f"• {e.get('summary', '(No Title)')} (All Day)\n", style="green")
             for t in tasks:
-                status = "✔" if t.get("status") == "completed" else "☐"
+                status = "✓" if t.get("status") == "completed" else "○"
                 cell_text.append(f"{status} {t.get('title', '')} (Task)\n", style="yellow")
             table.add_row("All Day", cell_text, height=None)
             
@@ -889,7 +889,7 @@ class CalendarTab(Vertical):
 
         detail_view.write("\n[bold yellow]--- Google Tasks ({}) ---[/bold yellow]".format(len(day_tasks)))
         for t in day_tasks:
-            status = "[bold green]✔ Done[/bold green]" if t.get("status") == "completed" else "[bold red]☐ Active[/bold red]"
+            status = "[bold green]✓ Done[/bold green]" if t.get("status") == "completed" else "[bold red]○ Active[/bold red]"
             detail_view.write(f"• {status} {rich_escape(t.get('title', ''))}")
             if t.get("notes"):
                 detail_view.write(f"  [dim]Notes: {rich_escape(t.get('notes'))}[/dim]")
@@ -1336,7 +1336,7 @@ class ContactsTab(Vertical):
             id="contacts-header-row"
         )
         yield Horizontal(
-            Button("✉ Email Contact", variant="success", id="contacts-email-btn"),
+            Button("Email Contact", variant="success", id="contacts-email-btn"),
             Button("Refresh", id="contacts-ref-btn"),
             classes="btn-row"
         )

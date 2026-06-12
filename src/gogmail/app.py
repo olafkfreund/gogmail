@@ -27,7 +27,7 @@ from gogmail.gog_api import GogAPI, set_error_sink, set_account
 from gogmail.gemini_api import GeminiAPI
 
 DEFAULT_THEME = "gruvbox"
-BADGE = "✨ Created using Claude Code"
+BADGE = "Created using Claude Code"
 VALID_THEMES = {key for key, _ in THEMES}
 
 
@@ -540,33 +540,35 @@ class GogMailApp(App):
         tree = self.query_one("#sidebar-tree")
         tree.show_root = False
 
-        gmail = tree.root.add("✉ Gmail", expand=True)
-        gmail.add_leaf("📥 Inbox", data={"type": "gmail", "query": "label:INBOX"})
-        gmail.add_leaf("★ Starred", data={"type": "gmail", "query": "is:starred"})
-        gmail.add_leaf("↗ Sent", data={"type": "gmail", "query": "is:sent"})
-        gmail.add_leaf("✎ Drafts", data={"type": "gmail", "query": "is:draft"})
-        gmail.add_leaf("🗑 Trash", data={"type": "gmail", "query": "is:trash"})
+        # Single-width geometric markers only: emoji render at inconsistent
+        # widths across terminals/fonts and make the sidebar look ragged.
+        gmail = tree.root.add("▪ Gmail", expand=True)
+        gmail.add_leaf("• Inbox", data={"type": "gmail", "query": "label:INBOX"})
+        gmail.add_leaf("• Starred", data={"type": "gmail", "query": "is:starred"})
+        gmail.add_leaf("• Sent", data={"type": "gmail", "query": "is:sent"})
+        gmail.add_leaf("• Drafts", data={"type": "gmail", "query": "is:draft"})
+        gmail.add_leaf("• Trash", data={"type": "gmail", "query": "is:trash"})
 
-        tree.root.add_leaf("📅 Calendar", data={"type": "calendar"})
+        tree.root.add_leaf("▪ Calendar", data={"type": "calendar"})
 
-        drive = tree.root.add("📁 Drive", expand=True)
-        drive.add_leaf("🗎 All Files", data={"type": "drive"})
-        drive.add_leaf("📝 Docs", data={"type": "docs"})
-        drive.add_leaf("📊 Sheets", data={"type": "sheets"})
-        drive.add_leaf("⧉ Slides", data={"type": "slides"})
-        drive.add_leaf("⎔ Forms", data={"type": "forms"})
+        drive = tree.root.add("▪ Drive", expand=True)
+        drive.add_leaf("• All Files", data={"type": "drive"})
+        drive.add_leaf("• Docs", data={"type": "docs"})
+        drive.add_leaf("• Sheets", data={"type": "sheets"})
+        drive.add_leaf("• Slides", data={"type": "slides"})
+        drive.add_leaf("• Forms", data={"type": "forms"})
 
-        tree.root.add_leaf("📹 Meet", data={"type": "meet"})
-        tree.root.add_leaf("📞 Zoom", data={"type": "zoom"})
-        tree.root.add_leaf("👤 Contacts", data={"type": "contacts"})
-        tree.root.add_leaf("✓ Tasks", data={"type": "tasks"})
-        tree.root.add_leaf("💬 Chat", data={"type": "chat"})
+        tree.root.add_leaf("▪ Meet", data={"type": "meet"})
+        tree.root.add_leaf("▪ Zoom", data={"type": "zoom"})
+        tree.root.add_leaf("▪ Contacts", data={"type": "contacts"})
+        tree.root.add_leaf("▪ Tasks", data={"type": "tasks"})
+        tree.root.add_leaf("▪ Chat", data={"type": "chat"})
 
         # Populated asynchronously from `gog auth list` in _preflight.
-        self._accounts_node = tree.root.add("👤 Accounts", expand=True)
+        self._accounts_node = tree.root.add("▪ Accounts", expand=True)
 
-        settings = tree.root.add("⚙ Settings", expand=True)
-        settings.add_leaf("🎨 Select Theme", data={"type": "select-theme"})
+        settings = tree.root.add("▪ Settings", expand=True)
+        settings.add_leaf("• Select Theme", data={"type": "select-theme"})
 
         tree.select_node(gmail.children[0])
 
@@ -616,7 +618,7 @@ class GogMailApp(App):
             return
         node.remove_children()
         for email in accounts:
-            marker = "● " if email == self.account else "  "
+            marker = "● " if email == self.account else "○ "
             # Ellipsize: the 26-col sidebar wraps long addresses awkwardly.
             shown = email if len(email) <= 20 else email[:19] + "…"
             node.add_leaf(f"{marker}{shown}", data={"type": "account", "email": email})
@@ -675,7 +677,7 @@ class GogMailApp(App):
 
         if node_type == "gmail":
             switcher.current = "gmail-view"
-            self.title = f"Google Workspace - Gmail ({event.node.label})"
+            self.title = f"Google Workspace - Gmail ({str(event.node.label).lstrip('• ')})"
             await self.query_one(GmailTab).set_query(data.get("query", "label:INBOX"))
         elif node_type == "select-theme":
             self.open_theme_dialog()
@@ -720,7 +722,7 @@ class GogMailApp(App):
         switcher = self.query_one("#content-switcher")
         if node_type == "gmail":
             switcher.current = "gmail-view"
-            self.title = "Google Workspace - Gmail (📥 Inbox)"
+            self.title = "Google Workspace - Gmail (Inbox)"
             await self.query_one(GmailTab).set_query("label:INBOX")
             return
         view_id, label = TREE_VIEWS[node_type]
