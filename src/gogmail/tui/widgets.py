@@ -1110,18 +1110,24 @@ class DriveMimeTab(Vertical):
     NEW_BTN_ID = ""
     NEW_LABEL = "New"
     REF_BTN_ID = ""
+    BROWSER_BTN_ID = ""
     NEW_DIALOG = ""           # GogMailApp method name to open the create dialog
+    OPEN_ON_SELECT = False    # row click opens the file in the browser
 
-    def compose(self):
-        yield Horizontal(
+    def _header(self):
+        return Horizontal(
             Label(self.HEADER, classes="view-header"),
             Horizontal(
                 Button(self.NEW_LABEL, variant="success", id=self.NEW_BTN_ID),
+                Button("Browser", variant="primary", id=self.BROWSER_BTN_ID),
                 Button("Refresh", id=self.REF_BTN_ID),
                 classes="header-buttons"
             ),
             classes="view-header-row"
         )
+
+    def compose(self):
+        yield self._header()
         yield DataTable(id=self.LIST_TABLE_ID)
 
     def on_mount(self):
@@ -1139,11 +1145,31 @@ class DriveMimeTab(Vertical):
             table.add_row(f.get("name", ""), f.get("id", ""), key=f.get("id"))
         self.post_message(StatusNotification(f"{self.NOUN} updated."))
 
+    def open_in_browser(self, file_id: str):
+        f = next((x for x in getattr(self, "files_data", []) if x.get("id") == file_id), {})
+        url = f.get("webViewLink") or f"https://drive.google.com/open?id={file_id}"
+        try:
+            webbrowser.open(url)
+            self.post_message(StatusNotification(f"Opened {f.get('name', 'file')} in browser."))
+        except Exception as e:
+            self.post_message(StatusNotification(f"Could not open browser: {e}", is_error=True))
+
     async def on_button_pressed(self, event: Button.Pressed):
         if event.button.id == self.NEW_BTN_ID:
             getattr(self.app, self.NEW_DIALOG)()
         elif event.button.id == self.REF_BTN_ID:
             await self.refresh_list()
+        elif event.button.id == self.BROWSER_BTN_ID:
+            table = self.query_one(f"#{self.LIST_TABLE_ID}")
+            if table.cursor_row is None:
+                self.post_message(StatusNotification(f"Select one of the {self.NOUN} first.", is_error=True))
+                return
+            self.open_in_browser(table.ordered_rows[table.cursor_row].key.value)
+
+    async def on_data_table_row_selected(self, event: DataTable.RowSelected):
+        # Slides/Forms have no in-TUI preview: clicking opens the web editor.
+        if self.OPEN_ON_SELECT and event.data_table.id == self.LIST_TABLE_ID:
+            self.open_in_browser(event.row_key.value)
 
 
 class DocsTab(DriveMimeTab):
@@ -1155,18 +1181,11 @@ class DocsTab(DriveMimeTab):
     NEW_BTN_ID = "doc-new-btn"
     NEW_LABEL = "New Doc"
     REF_BTN_ID = "doc-ref-btn"
+    BROWSER_BTN_ID = "doc-browser-btn"
     NEW_DIALOG = "open_doc_create_dialog"
 
     def compose(self):
-        yield Horizontal(
-            Label(self.HEADER, classes="view-header"),
-            Horizontal(
-                Button(self.NEW_LABEL, variant="success", id=self.NEW_BTN_ID),
-                Button("Refresh", id=self.REF_BTN_ID),
-                classes="header-buttons"
-            ),
-            classes="view-header-row"
-        )
+        yield self._header()
         yield Horizontal(
             DataTable(id="docs-table"),
             RichLog(id="doc-viewer", highlight=True, markup=True, wrap=True, min_width=0),
@@ -1184,7 +1203,13 @@ class DocsTab(DriveMimeTab):
             text = await GogAPI.docs_cat(doc_id)
         finally:
             viewer.loading = False
-        viewer.write(text if text.strip() else "[dim](Empty document.)[/dim]")
+        if text.strip():
+            # Text(): document content must render literally — markdown links
+            # like [name](url) are Rich markup and raised MarkupError, leaving
+            # the viewer blank.
+            viewer.write(Text(text))
+        else:
+            viewer.write("[dim](Empty document.)[/dim]")
         self.post_message(StatusNotification("Doc read successfully."))
 
 
@@ -1197,18 +1222,11 @@ class SheetsTab(DriveMimeTab):
     NEW_BTN_ID = "sheet-new-btn"
     NEW_LABEL = "New Sheet"
     REF_BTN_ID = "sheet-ref-btn"
+    BROWSER_BTN_ID = "sheet-browser-btn"
     NEW_DIALOG = "open_sheet_create_dialog"
 
     def compose(self):
-        yield Horizontal(
-            Label(self.HEADER, classes="view-header"),
-            Horizontal(
-                Button(self.NEW_LABEL, variant="success", id=self.NEW_BTN_ID),
-                Button("Refresh", id=self.REF_BTN_ID),
-                classes="header-buttons"
-            ),
-            classes="view-header-row"
-        )
+        yield self._header()
         yield Horizontal(
             DataTable(id="sheets-list-table"),
             DataTable(id="sheet-grid"),
@@ -1255,7 +1273,9 @@ class SlidesTab(DriveMimeTab):
     NEW_BTN_ID = "slide-new-btn"
     NEW_LABEL = "New Presentation"
     REF_BTN_ID = "slide-ref-btn"
+    BROWSER_BTN_ID = "slide-browser-btn"
     NEW_DIALOG = "open_slide_create_dialog"
+    OPEN_ON_SELECT = True
 
 
 class FormsTab(DriveMimeTab):
@@ -1267,7 +1287,9 @@ class FormsTab(DriveMimeTab):
     NEW_BTN_ID = "form-new-btn"
     NEW_LABEL = "New Form"
     REF_BTN_ID = "form-ref-btn"
+    BROWSER_BTN_ID = "form-browser-btn"
     NEW_DIALOG = "open_form_create_dialog"
+    OPEN_ON_SELECT = True
 
 
 # --- MEET TAB ---
@@ -1291,12 +1313,14 @@ class MeetTab(Vertical):
             log = self.query_one("#meet-output")
             log.clear()
             if success:
-                log.write(f"[bold green]Google Meet Space Created successfully![/bold green]\n")
-                log.write(f"Meeting URL: {link}\n")
-                log.write("[italic]URL printed and copied to clipboard.[/italic]")
+                self.app.copy_to_clipboard(link)
+                log.write("[bold green]Meeting created.[/bold green]\n")
+                log.write(f"[bold][link={link}]{link}[/link][/bold]\n")
+                log.write("[dim]Copied to clipboard.[/dim]")
+                self.post_message(StatusNotification("Meet link copied to clipboard."))
             else:
-                log.write(f"[red]Failed to create Meet space: {link}[/red]")
-            self.post_message(StatusNotification("Meet space complete."))
+                log.write(f"[red]Failed to create Meet space: {rich_escape(link)}[/red]")
+                self.post_message(StatusNotification("Meet creation failed.", is_error=True))
 
 
 # --- ZOOM TAB ---
@@ -1579,15 +1603,23 @@ class ChatTab(Vertical):
         spaces = await GogAPI.chat_spaces()
         self.spaces_data = spaces
 
-        for s in spaces:
-            # gog returns the space id as `resource` (e.g. spaces/AAA); DMs have
-            # no displayName, so synthesize a readable label.
+        async def label_for(s) -> str:
+            # gog returns the space id as `resource` (spaces/AAA); DMs have no
+            # displayName, so resolve the other participant's real name from
+            # the DM's recent senders (People API, cached).
             space_id = s.get("name") or s.get("resource") or ""
-            label = s.get("displayName")
-            if not label:
-                short = space_id.split("/")[-1]
-                label = f"DM {short}" if s.get("type") == "DIRECT_MESSAGE" else short
-            table.add_row(label, key=space_id)
+            if s.get("displayName"):
+                return s["displayName"]
+            if s.get("type") == "DIRECT_MESSAGE":
+                name = await GogAPI.chat_dm_label(space_id)
+                if name:
+                    return name
+                return f"DM {space_id.split('/')[-1]}"
+            return space_id.split("/")[-1]
+
+        labels = await asyncio.gather(*(label_for(s) for s in spaces))
+        for s, label in zip(spaces, labels):
+            table.add_row(label, key=s.get("name") or s.get("resource") or "")
             
         self.post_message(StatusNotification("Spaces loaded."))
 
@@ -1599,9 +1631,17 @@ class ChatTab(Vertical):
         
         messages = await GogAPI.chat_messages(self.selected_space_id)
         for m in messages:
-            # Escape API-provided strings: a message containing "[bold]" must
-            # render literally, not as Rich markup (or raise MarkupError).
-            sender = rich_escape(m.get("sender", {}).get("displayName", "System"))
+            # gog returns `sender` as a bare "users/<id>" string; resolve it to
+            # a real name (cached). Escape everything written to the log.
+            raw = m.get("sender")
+            if isinstance(raw, dict):
+                sender = raw.get("displayName") or raw.get("name", "System")
+            else:
+                sender = raw or "System"
+            if sender.startswith("users/"):
+                name, _ = await GogAPI.person_info(sender)
+                sender = name or sender.split("/")[-1]
+            sender = rich_escape(sender)
             text = rich_escape(m.get("text", ""))
             time_str = m.get("createTime", "")[:16].replace("T", " ")
             log.write(f"[dim]{time_str}[/dim] [bold cyan]{sender}:[/bold cyan] {text}")

@@ -427,8 +427,12 @@ class GogAPI:
     # --- Meet ---
     @staticmethod
     async def meet_create() -> tuple[bool, str]:
+        """Create a Meet space; on success returns just the meeting URL."""
         success, res = await run_gog(["meet", "create"])
-        # Extract meeting code/link from response
+        if success and isinstance(res, dict):
+            url = res.get("meeting_uri") or res.get("meetingUri") or ""
+            if url:
+                return True, url
         return success, _str_result(res)
 
     # --- Zoom ---
@@ -532,9 +536,52 @@ class GogAPI:
         return _extract_list(success, res, "spaces")
 
     @staticmethod
-    async def chat_messages(space_id: str) -> list:
-        success, res = await run_gog(["chat", "messages", "list", space_id])
+    async def chat_messages(space_id: str, max_results: int = 50) -> list:
+        success, res = await run_gog(["chat", "messages", "list", space_id,
+                                      "--max", str(max_results)])
         return _extract_list(success, res, "messages")
+
+    # Chat messages reference senders as bare "users/<id>" strings; resolve them
+    # to (display name, emails) via the People API, cached for the session.
+    _person_cache: dict = {}
+
+    @classmethod
+    async def person_info(cls, user_id: str) -> tuple[str, set]:
+        pid = "people/" + user_id.split("/")[-1]
+        if pid in cls._person_cache:
+            return cls._person_cache[pid]
+        ok, res = await run_gog(["people", "get", pid], quiet=True)
+        name, emails = "", set()
+        if ok and isinstance(res, dict):
+            person = res.get("person") or res
+            for n in person.get("names", []):
+                if n.get("displayName"):
+                    name = n["displayName"]
+                    break
+            emails = {e.get("value", "").lower() for e in person.get("emailAddresses", []) if e.get("value")}
+        cls._person_cache[pid] = (name, emails)
+        return name, emails
+
+    @classmethod
+    async def chat_dm_label(cls, space_id: str) -> str:
+        """Best-effort human label for a DM: the other participant's name."""
+        own = (get_account() or "").lower()
+        seen = []
+        for m in await cls.chat_messages(space_id, max_results=10):
+            sender = m.get("sender")
+            sid = sender if isinstance(sender, str) else (sender or {}).get("name", "")
+            if sid and sid not in seen:
+                seen.append(sid)
+        for sid in seen:
+            name, emails = await cls.person_info(sid)
+            if name and (not own or own not in emails):
+                return name
+        # Fall back to any resolvable sender (e.g. a DM with only own messages).
+        for sid in seen:
+            name, _ = await cls.person_info(sid)
+            if name:
+                return name
+        return ""
 
     @staticmethod
     async def chat_send_message(space_id: str, text: str) -> bool:
