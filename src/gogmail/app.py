@@ -17,8 +17,8 @@ from gogmail.tui.widgets import (
     TasksTab, ChatTab, StatusNotification
 )
 from gogmail.tui.screens import (
-    PromptDialog, TaskCreateScreen, CalendarCreateScreen, GmailComposeScreen,
-    ThemeSelectScreen, THEMES
+    ConfirmDialog, PromptDialog, TaskCreateScreen, CalendarCreateScreen,
+    GmailComposeScreen, ThemeSelectScreen, THEMES
 )
 from gogmail.gog_api import GogAPI, set_error_sink, set_account
 from gogmail.gemini_api import GeminiAPI
@@ -508,7 +508,9 @@ class GogMailApp(App):
         node.remove_children()
         for email in accounts:
             marker = "● " if email == self.account else "  "
-            node.add_leaf(f"{marker}{email}", data={"type": "account", "email": email})
+            # Ellipsize: the 26-col sidebar wraps long addresses awkwardly.
+            shown = email if len(email) <= 20 else email[:19] + "…"
+            node.add_leaf(f"{marker}{shown}", data={"type": "account", "email": email})
 
     async def switch_account(self, email: str) -> None:
         if not email or email == self.account:
@@ -624,6 +626,13 @@ class GogMailApp(App):
     def save_settings(self) -> None:
         self.config.update({"theme": self.theme_name, "ai_width": self.ai_width, "account": self.account})
         save_config(self.config)
+
+    def confirm(self, message: str, on_confirm, confirm_label: str = "Delete") -> None:
+        """Ask before a destructive action; runs the async on_confirm if accepted."""
+        async def handle(result):
+            if result:
+                await on_confirm()
+        self.push_screen(ConfirmDialog(message, confirm_label), handle)
 
     # --- Generic dialog dispatch ------------------------------------------
     async def _run_mutation(self, working_msg, coro, success_msg, refresh=None) -> bool:

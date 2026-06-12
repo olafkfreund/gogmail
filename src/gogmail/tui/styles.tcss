@@ -128,12 +128,12 @@
 }
 
 #calendar-table {
-    width: 50fr;
+    width: 65fr;
     height: 100%;
 }
 
 #calendar-detail {
-    width: 50fr;
+    width: 35fr;
     height: 100%;
 }
 

@@ -287,6 +287,39 @@ def view_media_file(app, file_path: str):
         except Exception as e:
             app.notify(f"Failed to open: {str(e)}", severity="error")
 
+def human_size(size) -> str:
+    """'284113' -> '277 KB'. Google Docs-native files have no size -> '—'."""
+    try:
+        n = int(size)
+    except (TypeError, ValueError):
+        return "—"
+    if n <= 0:
+        return "—"
+    for unit in ("B", "KB", "MB", "GB", "TB"):
+        if n < 1024 or unit == "TB":
+            return f"{n:.0f} {unit}" if unit == "B" else f"{n:.1f} {unit}".replace(".0 ", " ")
+        n /= 1024
+    return f"{n} B"
+
+
+def relative_date(date_str: str) -> str:
+    """Compact mail-client date: time today, weekday this week, 'Jun 10' else."""
+    if not date_str:
+        return ""
+    try:
+        dt = datetime.strptime(date_str[:16], "%Y-%m-%d %H:%M")
+    except ValueError:
+        return date_str
+    now = datetime.now()
+    if dt.date() == now.date():
+        return dt.strftime("%H:%M")
+    if (now.date() - dt.date()).days < 7:
+        return dt.strftime("%a %H:%M")
+    if dt.year == now.year:
+        return dt.strftime("%b %d")
+    return dt.strftime("%Y-%m-%d")
+
+
 class StatusNotification(Message):
     """Notify main app to update status bar. Set is_error to surface a toast."""
     def __init__(self, message: str, is_error: bool = False):
@@ -367,13 +400,17 @@ class GmailTab(Vertical):
         threads = await GogAPI.gmail_search(query)
         self.threads_data = threads
         
+        hidden_labels = {"CATEGORY_UPDATES", "CATEGORY_PERSONAL", "UNREAD"}
         for idx, t in enumerate(threads):
-            labels_str = ", ".join([l for l in t.get("labels", []) if l not in ["CATEGORY_UPDATES", "CATEGORY_PERSONAL"]])
+            labels = t.get("labels", [])
+            labels_str = ", ".join(l for l in labels if l not in hidden_labels)
+            # Unread rows are bold (the UNREAD label itself is hidden as noise).
+            style = "bold" if "UNREAD" in labels else ""
             table.add_row(
-                t.get("date", ""),
-                t.get("from", "")[:30],
-                t.get("subject", ""),
-                labels_str,
+                Text(relative_date(t.get("date", "")), style=style),
+                Text(t.get("from", "")[:30], style=style),
+                Text(t.get("subject", ""), style=style),
+                Text(labels_str, style="dim"),
                 key=t.get("id")
             )
         self.post_message(StatusNotification(f"Loaded {len(threads)} emails."))
@@ -465,10 +502,12 @@ class GmailTab(Vertical):
             self.query_one("#gmail-switcher").current = "gmail-list-view"
             await self.refresh_emails()
         elif event.button.id == "gmail-trash-btn":
-            await GogAPI.gmail_trash(thread_id)
-            self.post_message(StatusNotification(f"Trashed {thread_id}"))
-            self.query_one("#gmail-switcher").current = "gmail-list-view"
-            await self.refresh_emails()
+            async def do_trash():
+                await GogAPI.gmail_trash(thread_id)
+                self.post_message(StatusNotification(f"Trashed {thread_id}"))
+                self.query_one("#gmail-switcher").current = "gmail-list-view"
+                await self.refresh_emails()
+            self.app.confirm("Move this conversation to Trash?", do_trash, "Trash")
         elif event.button.id == "gmail-read-btn":
             await GogAPI.gmail_mark_read(thread_id)
             self.post_message(StatusNotification(f"Marked {thread_id} as read"))
@@ -591,6 +630,8 @@ class CalendarTab(Vertical):
             
         # 3. Render the active view
         self.render_view()
+        self.post_message(StatusNotification(
+            f"Loaded {len(self.events_data)} events, {len(self.tasks_data)} tasks."))
 
     def render_view(self):
 
@@ -671,7 +712,9 @@ class CalendarTab(Vertical):
                         count += 1
                         
                     row_cells.append(cell_content)
-                table.add_row(*row_cells)
+                # height=None: month cells hold several event/task lines; the
+                # default height of 1 squashes the grid to single-line rows.
+                table.add_row(*row_cells, height=None)
                 
         elif self.current_view == "week":
             table.cursor_type = "cell"
@@ -698,8 +741,8 @@ class CalendarTab(Vertical):
                     status = "✔" if t.get("status") == "completed" else "☐"
                     cell_text.append(f"{status} {t.get('title', '')[:10]}\n", style="yellow")
                 row_cells.append(cell_text)
-            table.add_row(*row_cells)
-            
+            table.add_row(*row_cells, height=None)
+
             for hour in range(24):
                 row_cells = [Text(f"{hour:02d}:00", style="dim")]
                 row_idx = hour + 1
@@ -721,7 +764,7 @@ class CalendarTab(Vertical):
                     for e in hourly_events:
                         cell_text.append(f"• {e.get('summary', '(No Title)')[:12]}\n", style="green")
                     row_cells.append(cell_text)
-                table.add_row(*row_cells)
+                table.add_row(*row_cells, height=None)
                 
         elif self.current_view == "day":
             table.cursor_type = "row"
@@ -736,7 +779,7 @@ class CalendarTab(Vertical):
             for t in tasks:
                 status = "✔" if t.get("status") == "completed" else "☐"
                 cell_text.append(f"{status} {t.get('title', '')} (Task)\n", style="yellow")
-            table.add_row("All Day", cell_text)
+            table.add_row("All Day", cell_text, height=None)
             
             for hour in range(24):
                 row_idx = hour + 1
@@ -759,7 +802,7 @@ class CalendarTab(Vertical):
                     end_time = e.get("end", {}).get("dateTime", "")
                     time_range = f"{start_time[11:16]} - {end_time[11:16]}" if start_time else ""
                     cell_text.append(f"• [{time_range}] {e.get('summary', '(No Title)')} (Location: {e.get('location', 'N/A')})\n", style="green")
-                table.add_row(f"{hour:02d}:00", cell_text)
+                table.add_row(f"{hour:02d}:00", cell_text, height=None)
 
         self.update_detail_panel()
 
@@ -922,9 +965,13 @@ class CalendarTab(Vertical):
             self.app.open_calendar_edit_dialog(self.selected_event)
             return
         elif event.button.id == "cal-del-btn":
-            await GogAPI.calendar_delete_event("primary", event_id)
-            self.post_message(StatusNotification("Event deleted."))
-            await self.refresh_calendar()
+            summary = self.selected_event.get("summary", "(No Title)")
+
+            async def do_delete():
+                await GogAPI.calendar_delete_event("primary", event_id)
+                self.post_message(StatusNotification("Event deleted."))
+                await self.refresh_calendar()
+            self.app.confirm(f"Delete event “{summary}”?", do_delete)
         elif event.button.id in ["cal-rsvp-yes", "cal-rsvp-no"]:
             resp = "yes" if event.button.id == "cal-rsvp-yes" else "no"
             await GogAPI.calendar_respond_event("primary", event_id, resp)
@@ -956,7 +1003,7 @@ class DriveTab(Vertical):
     def on_mount(self):
         table = self.query_one("#drive-table")
         table.cursor_type = "row"
-        table.add_columns("Name", "Type", "Size (bytes)", "Owner", "ID")
+        table.add_columns("Name", "Type", "Size", "Owner")
 
     async def refresh_files(self, query: str = None):
         self.post_message(StatusNotification("Fetching Drive inventory..."))
@@ -974,9 +1021,8 @@ class DriveTab(Vertical):
             table.add_row(
                 f.get("name", ""),
                 f.get("mimeType", "").split(".")[-1],
-                str(f.get("size", "0")),
+                human_size(f.get("size")),
                 owner,
-                f.get("id", ""),
                 key=f.get("id")
             )
         self.post_message(StatusNotification(f"Loaded {len(files)} files."))
@@ -1042,9 +1088,11 @@ class DriveTab(Vertical):
             
             self.run_worker(run_view())
         elif event.button.id == "drive-del-btn":
-            await GogAPI.drive_delete(file_id)
-            self.post_message(StatusNotification("Moved file to trash."))
-            await self.refresh_files()
+            async def do_delete():
+                await GogAPI.drive_delete(file_id)
+                self.post_message(StatusNotification("Moved file to trash."))
+                await self.refresh_files()
+            self.app.confirm(f"Delete “{file_name}”?", do_delete)
 
 
 # --- DRIVE MIME-TYPE TABS (Docs / Sheets / Slides / Forms) ---
@@ -1489,9 +1537,14 @@ class TasksTab(Vertical):
             t_table = self.query_one("#tasks-table")
             if t_table.cursor_row is not None:
                 task_id = t_table.ordered_rows[t_table.cursor_row].key.value
-                await GogAPI.tasks_delete(self.selected_list_id, task_id)
-                self.post_message(StatusNotification("Task deleted."))
-                await self.refresh_tasks()
+                title = next(
+                    (t.get("title", "") for t in getattr(self, "tasks_data", []) if t.get("id") == task_id), "")
+
+                async def do_delete():
+                    await GogAPI.tasks_delete(self.selected_list_id, task_id)
+                    self.post_message(StatusNotification("Task deleted."))
+                    await self.refresh_tasks()
+                self.app.confirm(f"Delete task “{title}”?", do_delete)
 
 
 # --- CHAT TAB ---

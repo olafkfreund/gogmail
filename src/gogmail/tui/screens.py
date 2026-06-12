@@ -30,6 +30,32 @@ import tempfile
 import shutil
 import subprocess
 
+class ConfirmDialog(ModalScreen):
+    """Yes/no confirmation for destructive actions. Dismisses with True/False."""
+    def __init__(self, message: str, confirm_label: str = "Delete"):
+        super().__init__()
+        self.message = message
+        self.confirm_label = confirm_label
+
+    def compose(self):
+        yield Vertical(
+            Label(self.message, classes="dialog-title"),
+            Horizontal(
+                Button(self.confirm_label, variant="error", id="confirm-btn"),
+                Button("Cancel", variant="primary", id="cancel-btn"),
+                classes="btn-row"
+            ),
+            id="dialog-container"
+        )
+
+    def on_mount(self):
+        # Cancel is focused by default: Enter must never destroy by accident.
+        self.query_one("#cancel-btn").focus()
+
+    def on_button_pressed(self, event: Button.Pressed):
+        self.dismiss(event.button.id == "confirm-btn")
+
+
 class PromptDialog(ModalScreen):
     """Generic text input popup dialog."""
     def __init__(self, title: str, placeholder: str = "", default: str = ""):
