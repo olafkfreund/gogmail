@@ -56,7 +56,7 @@ class TestErrorSink(unittest.TestCase):
 
 
 def _fake_run_gog(result):
-    async def _run(args, parse_json=True):
+    async def _run(args, parse_json=True, quiet=False, stdin_data=None):
         return result
     return _run
 
@@ -127,7 +127,7 @@ class TestContactSuggestions(unittest.IsolatedAsyncioTestCase):
 class TestGmailLabelsAndDrafts(unittest.IsolatedAsyncioTestCase):
     async def test_modify_labels_builds_add_remove(self):
         seen = {}
-        async def fake(args, parse_json=True, quiet=False):
+        async def fake(args, parse_json=True, quiet=False, stdin_data=None):
             seen["args"] = args
             return True, {}
         with mock.patch.object(gog_api, "run_gog", fake):
@@ -149,7 +149,7 @@ class TestGmailLabelsAndDrafts(unittest.IsolatedAsyncioTestCase):
 class TestCalendarUpdate(unittest.IsolatedAsyncioTestCase):
     async def test_update_includes_only_set_fields(self):
         seen = {}
-        async def fake(args, parse_json=True, quiet=False):
+        async def fake(args, parse_json=True, quiet=False, stdin_data=None):
             seen["args"] = args
             return True, {}
         with mock.patch.object(gog_api, "run_gog", fake):
@@ -164,7 +164,7 @@ class TestCalendarUpdate(unittest.IsolatedAsyncioTestCase):
 class TestDriveActions(unittest.IsolatedAsyncioTestCase):
     async def test_share_builds_args(self):
         seen = {}
-        async def fake(args, parse_json=True, quiet=False):
+        async def fake(args, parse_json=True, quiet=False, stdin_data=None):
             seen["args"] = args
             return True, {}
         with mock.patch.object(gog_api, "run_gog", fake):

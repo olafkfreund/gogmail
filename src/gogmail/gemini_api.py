@@ -12,7 +12,9 @@ class GeminiAPI:
             return "Error: GEMINI_API_KEY environment variable is not set."
 
         model = os.environ.get("GEMINI_MODEL_DEFAULT", "gemini-2.5-flash")
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+        # Key goes in a header, never the URL: requests exception strings include
+        # the URL, which would leak the key into gogmail.log.
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
         payload = {"contents": contents}
 
@@ -22,7 +24,8 @@ class GeminiAPI:
             }
 
         try:
-            response = requests.post(url, json=payload, timeout=30)
+            response = requests.post(url, json=payload, timeout=30,
+                                     headers={"x-goog-api-key": api_key})
             if response.status_code != 200:
                 logging.error(f"Gemini API returned error {response.status_code}: {response.text}")
                 return f"Error from Gemini API: {response.status_code} - {response.text}"

@@ -267,9 +267,11 @@ def view_media_file(app, file_path: str):
     # 2. PDF Viewing
     elif ext == '.pdf':
         if shutil.which("pdftotext"):
+            # List-form pipe (no shell): a crafted filename must never reach sh.
             with app.suspend():
-                cmd = f"pdftotext {subprocess.list2cmdline([file_path])} - | less"
-                subprocess.run(cmd, shell=True)
+                pdf = subprocess.Popen(["pdftotext", file_path, "-"], stdout=subprocess.PIPE)
+                subprocess.run(["less"], stdin=pdf.stdout)
+                pdf.wait()
             return
         
         try:
@@ -1015,8 +1017,11 @@ class DriveTab(Vertical):
             self.app.open_drive_download_dialog(file_id, file_name)
         elif event.button.id == "drive-view-btn":
             self.post_message(StatusNotification(f"Downloading {file_name} for preview..."))
-            temp_dir = tempfile.gettempdir()
+            # Private per-download dir (0700): a fixed /tmp/<name> path is
+            # predictable and writable by other local users.
+            temp_dir = tempfile.mkdtemp(prefix="gogmail-")
             temp_path = os.path.join(temp_dir, file_name)
+            self.app.register_temp_file(temp_path)
             
             async def run_view():
                 success, err = await GogAPI.drive_download(file_id, temp_path)

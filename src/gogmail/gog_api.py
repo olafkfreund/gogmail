@@ -3,8 +3,12 @@ import json
 import logging
 import os
 
-logging.basicConfig(level=logging.INFO, filename="gogmail.log", filemode="a",
-                    format="%(asctime)s - %(levelname)s - %(message)s")
+# Log under the XDG state dir, never the cwd (which may be a shared/tracked dir).
+_log_dir = os.path.join(
+    os.environ.get("XDG_STATE_HOME", os.path.expanduser("~/.local/state")), "gogmail")
+os.makedirs(_log_dir, exist_ok=True)
+logging.basicConfig(level=logging.INFO, filename=os.path.join(_log_dir, "gogmail.log"),
+                    filemode="a", format="%(asctime)s - %(levelname)s - %(message)s")
 
 # --- Error surfacing -------------------------------------------------------
 # Reads return empty values on failure so call sites stay simple, but a failed
@@ -49,12 +53,15 @@ def _report_error(cmd: list[str], err_msg: str) -> None:
             logging.error(f"Error sink raised: {e}")
 
 
-async def run_gog(args: list[str], parse_json: bool = True, quiet: bool = False) -> tuple[bool, any]:
+async def run_gog(args: list[str], parse_json: bool = True, quiet: bool = False,
+                  stdin_data: str = None) -> tuple[bool, any]:
     """Runs the local gog command asynchronously and returns (success, result).
 
     On failure the error is logged and (unless quiet) pushed to the registered
     error sink so it reaches the user, then returned as (False, message). Use
     quiet=True for speculative calls whose failure is handled by the caller.
+    stdin_data is piped to the process (for `--body-file -` style flags, so
+    bodies never appear in /proc/<pid>/cmdline).
     """
     cmd = ["gog"]
     if parse_json:
@@ -74,11 +81,13 @@ async def run_gog(args: list[str], parse_json: bool = True, quiet: bool = False)
     try:
         proc = await asyncio.create_subprocess_exec(
             *cmd,
+            stdin=asyncio.subprocess.PIPE if stdin_data is not None else None,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             env=os.environ
         )
-        stdout, stderr = await proc.communicate()
+        stdout, stderr = await proc.communicate(
+            input=stdin_data.encode() if stdin_data is not None else None)
 
         if proc.returncode != 0:
             err_msg = stderr.decode().strip()
@@ -197,12 +206,13 @@ class GogAPI:
 
     @staticmethod
     async def gmail_send(to: str, subject: str, body: str, thread_id: str = None, reply_to_message_id: str = None) -> tuple[bool, str]:
-        args = ["gmail", "send", "--to", to, "--subject", subject, "--body", body]
+        # Body goes via stdin (--body-file -): argv is world-readable in /proc.
+        args = ["gmail", "send", "--to", to, "--subject", subject, "--body-file", "-"]
         if thread_id:
             args.extend(["--thread-id", thread_id])
         if reply_to_message_id:
             args.extend(["--reply-to-message-id", reply_to_message_id, "--quote"])
-        success, res = await run_gog(args)
+        success, res = await run_gog(args, stdin_data=body)
         return success, _str_result(res)
 
     @staticmethod
@@ -223,12 +233,12 @@ class GogAPI:
 
     @staticmethod
     async def gmail_create_draft(to: str, subject: str, body: str, cc: str = "", bcc: str = "") -> tuple[bool, str]:
-        args = ["gmail", "drafts", "create", "--to", to, "--subject", subject, "--body", body]
+        args = ["gmail", "drafts", "create", "--to", to, "--subject", subject, "--body-file", "-"]
         if cc:
             args += ["--cc", cc]
         if bcc:
             args += ["--bcc", bcc]
-        success, res = await run_gog(args)
+        success, res = await run_gog(args, stdin_data=body)
         return success, _str_result(res)
 
     @staticmethod

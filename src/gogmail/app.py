@@ -532,6 +532,10 @@ class GogMailApp(App):
         for path in getattr(self, "_temp_files", []):
             try:
                 os.remove(path)
+                # Drive previews live in private gogmail-* dirs; remove those too.
+                parent = os.path.dirname(path)
+                if os.path.basename(parent).startswith("gogmail-"):
+                    os.rmdir(parent)
             except Exception:
                 pass
 
