@@ -1578,9 +1578,16 @@ class ChatTab(Vertical):
         
         spaces = await GogAPI.chat_spaces()
         self.spaces_data = spaces
-        
+
         for s in spaces:
-            table.add_row(s.get("displayName", s.get("name")), key=s.get("name"))
+            # gog returns the space id as `resource` (e.g. spaces/AAA); DMs have
+            # no displayName, so synthesize a readable label.
+            space_id = s.get("name") or s.get("resource") or ""
+            label = s.get("displayName")
+            if not label:
+                short = space_id.split("/")[-1]
+                label = f"DM {short}" if s.get("type") == "DIRECT_MESSAGE" else short
+            table.add_row(label, key=space_id)
             
         self.post_message(StatusNotification("Spaces loaded."))
 
