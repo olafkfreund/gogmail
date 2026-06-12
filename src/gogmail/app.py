@@ -1,4 +1,7 @@
+from functools import partial
+
 from textual.app import App, ComposeResult
+from textual.command import DiscoveryHit, Hit, Provider
 from textual.widgets import Header, Footer, Label, ContentSwitcher, Input, Button, RichLog, Tree, Static
 from textual.containers import Vertical, Horizontal, Container
 from textual.binding import Binding
@@ -129,6 +132,51 @@ async def _tool_create_meet(app, params) -> str:
     return f"Successfully created Google Meet space: {link}" if success else f"Failed to create Meet space: {link}"
 
 
+async def _tool_summarize_thread(app, params) -> str:
+    from gogmail.tui.widgets import best_email_text
+    tab = app.query_one(GmailTab)
+    thread_id = params.get("thread_id") or getattr(tab, "selected_thread_id", None)
+    if not thread_id:
+        return "Error: no email is selected and no thread_id was given."
+    stubs = await GogAPI.gmail_thread_messages(thread_id)
+    ids = [m.get("id") for m in stubs if m.get("id")][-5:] or [thread_id]
+    parts = []
+    for mid in ids:
+        msg = await GogAPI.gmail_get_message(mid)
+        if msg:
+            h = msg.get("headers", {})
+            parts.append(f"From: {h.get('from', '')}\nDate: {h.get('date', '')}\n"
+                         f"{best_email_text(msg)[:2000]}")
+    if not parts:
+        return "Error: could not fetch the thread content."
+    return ("Thread content (oldest first):\n\n" + "\n\n---\n\n".join(parts)
+            + "\n\nNow answer the user's request about this thread (summarize it "
+              "in a few bullets unless they asked for something else).")
+
+
+async def _tool_draft_reply(app, params) -> str:
+    from gogmail.tui.widgets import best_email_text
+    tab = app.query_one(GmailTab)
+    msg = getattr(tab, "selected_msg", None)
+    if not msg:
+        return "Error: no email is selected to reply to."
+    headers = msg.get("headers", {})
+    draft = await GeminiAPI.draft_reply(
+        original_subject=headers.get("subject", ""),
+        original_sender=headers.get("from", ""),
+        original_body=best_email_text(msg),
+        user_instructions=params.get("instructions", "Write an appropriate reply."),
+    )
+    app.open_compose_dialog(
+        to=headers.get("from", ""),
+        subject=f"Re: {headers.get('subject', '')}",
+        body=draft,
+        thread_id=msg.get("threadId"),
+        reply_to_message_id=msg.get("messageId"),
+    )
+    return "Opened a compose window with the drafted reply for the user to review and send."
+
+
 async def _tool_add_task(app, params) -> str:
     title = params.get("title")
     lists = await GogAPI.tasks_lists()
@@ -175,6 +223,20 @@ TOOLS = [
         "description": "Add a task to the default list",
         "params": [("title", True, "Task title"), ("notes", False, "Optional notes")],
         "handler": _tool_add_task,
+    },
+    {
+        "name": "summarize_thread",
+        "description": "Fetch the full content of the selected email thread (call this before "
+                       "summarizing or answering questions about the open email)",
+        "params": [("thread_id", False, "")],
+        "handler": _tool_summarize_thread,
+    },
+    {
+        "name": "draft_reply",
+        "description": "Draft a reply to the selected email and open it in the compose window "
+                       "for the user to review",
+        "params": [("instructions", False, "politely accept the invitation")],
+        "handler": _tool_draft_reply,
     },
 ]
 TOOL_BY_NAME = {t["name"]: t for t in TOOLS}
@@ -350,9 +412,45 @@ class AIAssistantPanel(Vertical):
         self._ai_task = asyncio.create_task(run_ai_safely())
 
 
+class GogMailCommands(Provider):
+    """ctrl+p command palette entries for every GogMail action and view."""
+
+    def _commands(self):
+        app = self.app
+        goto = lambda nt: partial(app.run_worker, app.goto_view(nt))
+        yield from (
+            ("Compose email", app.open_compose_dialog, "Write a new email"),
+            ("New calendar event", app.open_calendar_create_dialog, "Create a calendar event"),
+            ("New Google Doc", app.open_doc_create_dialog, "Create a document"),
+            ("New Google Sheet", app.open_sheet_create_dialog, "Create a spreadsheet"),
+            ("New Google Slides", app.open_slide_create_dialog, "Create a presentation"),
+            ("New Google Form", app.open_form_create_dialog, "Create a form"),
+            ("New Drive folder", app.open_drive_mkdir_dialog, "Create a folder in Drive"),
+            ("Upload file to Drive", app.open_drive_upload_dialog, "Upload a local file"),
+            ("Select theme", app.open_theme_dialog, "Switch the color theme"),
+            ("Toggle sidebar", app.action_toggle_sidebar, "Show/hide the sidebar (F2)"),
+            ("Toggle AI panel", app.action_toggle_ai, "Show/hide the Gemini drawer (F3)"),
+        )
+        yield ("Go to Gmail", goto("gmail"), "Open the Gmail inbox")
+        for node_type, (_view_id, label) in TREE_VIEWS.items():
+            yield (f"Go to {label}", goto(node_type), f"Open the {label} view")
+
+    async def search(self, query: str):
+        matcher = self.matcher(query)
+        for name, callback, help_text in self._commands():
+            score = matcher.match(name)
+            if score > 0:
+                yield Hit(score, matcher.highlight(name), callback, help=help_text)
+
+    async def discover(self):
+        for name, callback, help_text in self._commands():
+            yield DiscoveryHit(name, callback, help=help_text)
+
+
 class GogMailApp(App):
     """Main GogMail TUI application with tree-based navigation."""
     CSS_PATH = "tui/styles.tcss"
+    COMMANDS = App.COMMANDS | {GogMailCommands}
 
     BINDINGS = [
         # F2 is the tmux-safe sidebar toggle (ctrl+b is the default tmux prefix
@@ -365,8 +463,19 @@ class GogMailApp(App):
         Binding("alt+right", "resize_ai('increase')", "AI Width +"),
         Binding("alt+h", "resize_ai('decrease')", "AI Width -", show=False),
         Binding("alt+l", "resize_ai('increase')", "AI Width +", show=False),
+        # Mail-client muscle memory. Plain letters never fire while an Input
+        # or TextArea is focused (the widget consumes the key first).
+        Binding("c", "compose", "Compose"),
+        Binding("slash", "focus_search", "Search", show=False),
         Binding("q", "quit", "Quit"),
     ]
+
+    # Active view -> its search input (for the `/` binding).
+    SEARCH_INPUTS = {
+        "gmail-view": "#email-search-input",
+        "drive-view": "#drive-search-input",
+        "contacts-view": "#contacts-search-input",
+    }
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -605,6 +714,27 @@ class GogMailApp(App):
 
     def on_status_notification(self, event: StatusNotification):
         self.notify_status(event.message, error=getattr(event, "is_error", False))
+
+    async def goto_view(self, node_type: str) -> None:
+        """Navigate to a view by node type (used by the command palette)."""
+        switcher = self.query_one("#content-switcher")
+        if node_type == "gmail":
+            switcher.current = "gmail-view"
+            self.title = "Google Workspace - Gmail (📥 Inbox)"
+            await self.query_one(GmailTab).set_query("label:INBOX")
+            return
+        view_id, label = TREE_VIEWS[node_type]
+        switcher.current = view_id
+        self.title = f"Google Workspace - {label}"
+        await self._ensure_tab_loaded(node_type, view_id)
+
+    def action_compose(self):
+        self.open_compose_dialog()
+
+    def action_focus_search(self):
+        selector = self.SEARCH_INPUTS.get(self.query_one("#content-switcher").current)
+        if selector:
+            self.query_one(selector).focus()
 
     def action_toggle_sidebar(self):
         self.sidebar_visible = not self.sidebar_visible

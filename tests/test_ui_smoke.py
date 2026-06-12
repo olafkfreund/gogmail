@@ -82,6 +82,46 @@ class TestUiSmoke(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
             self.assertIsInstance(app.screen, GmailComposeScreen)
 
+    async def test_command_palette_opens_with_gogmail_provider(self):
+        from textual.command import CommandPalette
+        from gogmail.app import GogMailApp, GogMailCommands
+        app = GogMailApp()
+        self.assertIn(GogMailCommands, app.COMMANDS)
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
+            await pilot.press("ctrl+p")
+            await pilot.pause()
+            self.assertIsInstance(app.screen, CommandPalette)
+            for ch in "compose":
+                await pilot.press(ch)
+            await pilot.pause(0.5)  # provider search runs async; must not raise
+            await pilot.press("escape")
+
+    async def test_confirm_dialog_gates_destructive_action(self):
+        from gogmail.app import GogMailApp
+        from gogmail.tui.screens import ConfirmDialog
+        app = GogMailApp()
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
+            ran = []
+
+            async def do_it():
+                ran.append(True)
+
+            app.confirm("Delete the thing?", do_it)
+            await pilot.pause()
+            self.assertIsInstance(app.screen, ConfirmDialog)
+            # Cancel is focused by default: Enter must NOT run the action.
+            await pilot.press("enter")
+            await pilot.pause()
+            self.assertEqual(ran, [])
+            # Explicitly confirming does run it.
+            app.confirm("Delete the thing?", do_it)
+            await pilot.pause()
+            app.screen.query_one("#confirm-btn").press()
+            await pilot.pause()
+            self.assertEqual(ran, [True])
+
 
 if __name__ == "__main__":
     unittest.main()

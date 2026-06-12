@@ -201,6 +201,14 @@ class GogAPI:
         return {}
 
     @staticmethod
+    async def gmail_thread_messages(thread_id: str) -> list:
+        """All message stubs ({id, ...}) in a thread, oldest first."""
+        ok, res = await run_gog(["gmail", "thread", "get", thread_id], quiet=True)
+        if ok and isinstance(res, dict):
+            return (res.get("thread") or {}).get("messages") or []
+        return []
+
+    @staticmethod
     async def gmail_send(to: str, subject: str, body: str, thread_id: str = None, reply_to_message_id: str = None) -> tuple[bool, str]:
         # Body goes via stdin (--body-file -): argv is world-readable in /proc.
         args = ["gmail", "send", "--to", to, "--subject", subject, "--body-file", "-"]
