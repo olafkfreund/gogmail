@@ -501,16 +501,21 @@ class GmailTab(Vertical):
                 summary = await GeminiAPI.summarize_email(
                     subject=headers.get("subject", ""),
                     sender=headers.get("from", ""),
-                    body=format_email_body(msg.get("body", ""))
+                    # best_email_text handles HTML-only messages; the raw body
+                    # field would feed Gemini a wall of tags.
+                    body=best_email_text(msg)
                 )
             finally:
                 body_view.loading = False
             # Display summary in the text pane
             body_view.clear()
             body_view.write("[bold green]=== GEMINI SUMMARY ===[/bold green]\n")
-            body_view.write(summary)
+            body_view.write(rich_escape(summary))
             body_view.write("\n" + "-" * 40 + "\n")
-            body_view.write(format_email_body(msg.get("body", "")))
+            try:
+                body_view.write(best_email_text(msg))
+            except Exception:
+                body_view.write(Text(best_email_text(msg)))
             self.post_message(StatusNotification("Summary generated."))
         elif event.button.id == "gmail-reply-btn" and hasattr(self, "selected_msg"):
             msg = self.selected_msg
@@ -824,25 +829,27 @@ class CalendarTab(Vertical):
                 
             start = e.get("start", {}).get("dateTime", e.get("start", {}).get("date", ""))
             end = e.get("end", {}).get("dateTime", e.get("end", {}).get("date", ""))
-            time_str = f"[{start[11:16]}-{end[11:16]}]" if "T" in start else "[All Day]"
-            detail_view.write(f"• [bold green]{time_str}[/bold green] {e.get('summary', '(No Title)')}")
-            detail_view.write(f"  [magenta]ID:[/magenta] {e.get('id', '')}")
+            time_str = rich_escape(f"[{start[11:16]}-{end[11:16]}]" if "T" in start else "[All Day]")
+            # Escape all user/API-supplied event fields so a "[...]" in a title
+            # or description renders literally instead of breaking the markup.
+            detail_view.write(f"• [bold green]{time_str}[/bold green] {rich_escape(e.get('summary', '(No Title)'))}")
+            detail_view.write(f"  [magenta]ID:[/magenta] {rich_escape(e.get('id', ''))}")
             if e.get("organizer", {}).get("email"):
-                detail_view.write(f"  [magenta]Organizer:[/magenta] {e.get('organizer', {}).get('email')}")
+                detail_view.write(f"  [magenta]Organizer:[/magenta] {rich_escape(e.get('organizer', {}).get('email'))}")
             if e.get("location"):
-                detail_view.write(f"  [magenta]Location:[/magenta] {e.get('location')}")
+                detail_view.write(f"  [magenta]Location:[/magenta] {rich_escape(e.get('location'))}")
             if e.get("description"):
-                detail_view.write(f"  [dim]{e.get('description')}[/dim]")
+                detail_view.write(f"  [dim]{rich_escape(e.get('description'))}[/dim]")
             if e.get("hangoutLink"):
                 detail_view.write(f"  [blue][link={e.get('hangoutLink')}]Meet Link[/link][/blue]")
             detail_view.write("")
-            
+
         detail_view.write("\n[bold yellow]--- Google Tasks ({}) ---[/bold yellow]".format(len(day_tasks)))
         for t in day_tasks:
             status = "[bold green]✔ Done[/bold green]" if t.get("status") == "completed" else "[bold red]☐ Active[/bold red]"
-            detail_view.write(f"• {status} {t.get('title', '')}")
+            detail_view.write(f"• {status} {rich_escape(t.get('title', ''))}")
             if t.get("notes"):
-                detail_view.write(f"  [dim]Notes: {t.get('notes')}[/dim]")
+                detail_view.write(f"  [dim]Notes: {rich_escape(t.get('notes'))}[/dim]")
             detail_view.write("")
 
     async def on_data_table_cell_selected(self, event: DataTable.CellSelected):
@@ -1005,7 +1012,10 @@ class DriveTab(Vertical):
             
         selected_row_idx = table.cursor_row
         file_id = table.ordered_rows[selected_row_idx].key.value
-        file_name = self.files_data[selected_row_idx].get("name")
+        # Resolve the name by ID, not by row index: the visual order can diverge
+        # from files_data after a search/partial repopulation.
+        file_name = next(
+            (f.get("name") for f in getattr(self, "files_data", []) if f.get("id") == file_id), "")
         
         if event.button.id == "drive-share-btn":
             self.app.open_drive_share_dialog(file_id, file_name)
@@ -1171,7 +1181,9 @@ class SheetsTab(DriveMimeTab):
         res = await GogAPI.sheets_get(spreadsheet_id, "A1:G20")
 
         grid = self.query_one("#sheet-grid")
-        grid.clear()
+        # columns=True: stale headers from a previously-viewed (wider) sheet
+        # would otherwise misalign the new data.
+        grid.clear(columns=True)
 
         values = res.get("values", [])
         if not values:
@@ -1256,10 +1268,14 @@ class ZoomTab(Vertical):
     async def on_button_pressed(self, event: Button.Pressed):
         if event.button.id == "zoom-doctor-btn":
             self.post_message(StatusNotification("Validating Zoom configuration..."))
-            res = await GogAPI.zoom_doctor()
             log = self.query_one("#zoom-output")
             log.clear()
-            log.write(res)
+            log.loading = True
+            try:
+                res = await GogAPI.zoom_doctor()
+            finally:
+                log.loading = False
+            log.write(rich_escape(res or "(no output)"))
             self.post_message(StatusNotification("Zoom Doctor completed."))
 
 
@@ -1523,8 +1539,10 @@ class ChatTab(Vertical):
         
         messages = await GogAPI.chat_messages(self.selected_space_id)
         for m in messages:
-            sender = m.get("sender", {}).get("displayName", "System")
-            text = m.get("text", "")
+            # Escape API-provided strings: a message containing "[bold]" must
+            # render literally, not as Rich markup (or raise MarkupError).
+            sender = rich_escape(m.get("sender", {}).get("displayName", "System"))
+            text = rich_escape(m.get("text", ""))
             time_str = m.get("createTime", "")[:16].replace("T", " ")
             log.write(f"[dim]{time_str}[/dim] [bold cyan]{sender}:[/bold cyan] {text}")
 

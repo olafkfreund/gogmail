@@ -137,14 +137,10 @@ class GogAPI:
 
         Returns (ok, message). `message` is an actionable hint when not ok.
         """
-        # Temporarily silence the error sink: a failed preflight is expected and
-        # is reported through the returned message, not as a scary popup.
-        global _error_sink
-        saved, _error_sink = _error_sink, None
-        try:
-            success, res = await run_gog(["status"])
-        finally:
-            _error_sink = saved
+        # quiet=True: a failed preflight is expected and is reported through the
+        # returned message, not the error sink. (Nulling the global sink here
+        # would race with concurrent run_gog calls and swallow their errors.)
+        success, res = await run_gog(["status"], quiet=True)
 
         if not success:
             if res == "gog-not-found":

@@ -4,7 +4,6 @@ from textual.containers import Vertical, Horizontal
 from textual.suggester import Suggester
 from gogmail.gemini_api import GeminiAPI
 from gogmail.gog_api import GogAPI
-import asyncio
 
 
 class ContactSuggester(Suggester):
@@ -239,27 +238,34 @@ class GmailComposeScreen(ModalScreen):
             
             body_area.text = edited_text
         elif event.button.id == "ai-draft-btn":
-            asyncio.create_task(self.generate_ai_draft())
+            await self.generate_ai_draft()
 
     async def generate_ai_draft(self):
         user_instructions = self.query_one("#gemini-prompt").value
         if not user_instructions:
             return
-        
+
         body_area = self.query_one("#email-body")
+        previous_text = body_area.text
         body_area.text = "Generating draft with Gemini..."
-        
-        draft_text = await GeminiAPI.draft_reply(
-            original_subject=self.subject_default,
-            original_sender=self.to_default,
-            original_body=self.body_default,
-            user_instructions=user_instructions
-        )
-        body_area.text = draft_text
+
+        # Awaited (not a bare create_task) so a failure can never strand the
+        # placeholder text; on error, restore what the user had written.
+        try:
+            draft_text = await GeminiAPI.draft_reply(
+                original_subject=self.subject_default,
+                original_sender=self.to_default,
+                original_body=self.body_default,
+                user_instructions=user_instructions
+            )
+            body_area.text = draft_text
+        except Exception as e:
+            body_area.text = previous_text
+            self.app.notify(f"AI draft failed: {e}", severity="error")
 
     async def on_input_submitted(self, event: Input.Submitted):
         if event.input.id == "gemini-prompt":
-            asyncio.create_task(self.generate_ai_draft())
+            await self.generate_ai_draft()
 
 
 # Single source of truth for available themes: (key, display label).

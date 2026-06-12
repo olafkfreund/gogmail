@@ -9,6 +9,8 @@ import os
 import re
 import subprocess
 
+from rich.markup import escape as rich_escape
+
 from gogmail.tui.widgets import (
     GmailTab, CalendarTab, DriveTab, DocsTab, SheetsTab,
     SlidesTab, FormsTab, MeetTab, ZoomTab, ContactsTab,
@@ -291,7 +293,7 @@ class AIAssistantPanel(Vertical):
             return
 
         log = self.query_one("#ai-chat-history")
-        log.write(f"\n[bold yellow]You:[/bold yellow] {prompt}")
+        log.write(f"\n[bold yellow]You:[/bold yellow] {rich_escape(prompt)}")
         event.input.value = ""
 
         now_str = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S%z")
@@ -322,14 +324,14 @@ class AIAssistantPanel(Vertical):
                     pass
 
                 if tool_data is None:
-                    log.write(f"[bold green]Gemini:[/bold green] {response_text}")
+                    log.write(f"[bold green]Gemini:[/bold green] {rich_escape(response_text)}")
                     return
 
                 tool_name = tool_data.get("tool") or tool_data.get("tool_name") or tool_data.get("tool_code")
                 params = tool_data.get("parameters") or tool_data
                 log.write(f"[italic green]Executing {tool_name}...[/italic green]")
                 result_msg = await execute_tool(self.app, tool_name, params)
-                log.write(f"[bold green]Gemini (Tool Executed):[/bold green] {result_msg}")
+                log.write(f"[bold green]Gemini (Tool Executed):[/bold green] {rich_escape(result_msg)}")
                 self.chat_history.append(
                     {"role": "user", "parts": [{"text": f"Tool '{tool_name}' execution result: {result_msg}"}]}
                 )
@@ -337,7 +339,15 @@ class AIAssistantPanel(Vertical):
 
             log.write("[bold red]Gemini: Execution limit reached (max 5 tool calls).[/bold red]")
 
-        asyncio.create_task(run_ai())
+        async def run_ai_safely():
+            # An unhandled exception in a bare create_task is silently dropped,
+            # leaving "thinking..." on screen forever — surface it instead.
+            try:
+                await run_ai()
+            except Exception as e:
+                log.write(f"[bold red]Gemini error: {rich_escape(str(e))}[/bold red]")
+
+        self._ai_task = asyncio.create_task(run_ai_safely())
 
 
 class GogMailApp(App):
@@ -501,7 +511,7 @@ class GogMailApp(App):
             node.add_leaf(f"{marker}{email}", data={"type": "account", "email": email})
 
     async def switch_account(self, email: str) -> None:
-        if email == self.account:
+        if not email or email == self.account:
             return
         self.account = email
         set_account(email)
@@ -572,10 +582,20 @@ class GogMailApp(App):
         if not loader:
             return
         tab = self.query_one(f"#{view_id}")
-        if getattr(tab, "_loaded", False):
+        if getattr(tab, "_loaded", False) or getattr(tab, "_loading", False):
             return
-        tab._loaded = True
-        self.run_worker(getattr(tab, loader)())
+        tab._loading = True
+
+        async def load():
+            # Mark loaded only after success: a failed/cancelled first load must
+            # not leave the tab permanently empty.
+            try:
+                await getattr(tab, loader)()
+                tab._loaded = True
+            finally:
+                tab._loading = False
+
+        self.run_worker(load())
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "sidebar-compose-btn":
