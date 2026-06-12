@@ -2,7 +2,7 @@ from functools import partial
 
 from textual.app import App, ComposeResult
 from textual.command import DiscoveryHit, Hit, Provider
-from textual.widgets import Header, Footer, Label, ContentSwitcher, Input, Button, RichLog, Tree, Static
+from textual.widgets import Header, Footer, Label, ContentSwitcher, Input, Button, RichLog, Tree, Static, TextArea
 from textual.containers import Vertical, Horizontal, Container
 from textual.binding import Binding
 import asyncio
@@ -467,6 +467,10 @@ class GogMailApp(App):
         # or TextArea is focused (the widget consumes the key first).
         Binding("c", "compose", "Compose"),
         Binding("slash", "focus_search", "Search", show=False),
+        # ctrl+v pastes the system clipboard into the focused field (terminal
+        # bracketed paste also works; this covers tmux/remote sessions where it
+        # doesn't reach the app). Copy: select text with the mouse, ctrl+c.
+        Binding("ctrl+v", "paste_clipboard", "Paste", show=False, priority=True),
         Binding("q", "quit", "Quit"),
     ]
 
@@ -733,6 +737,17 @@ class GogMailApp(App):
     def action_compose(self):
         self.open_compose_dialog()
 
+    def action_paste_clipboard(self):
+        """Insert the system clipboard into the focused Input/TextArea."""
+        text = self.clipboard
+        if not text:
+            return
+        focused = self.focused
+        if isinstance(focused, Input):
+            focused.insert_text_at_cursor(text)
+        elif isinstance(focused, TextArea):
+            focused.insert(text)
+
     def action_focus_search(self):
         selector = self.SEARCH_INPUTS.get(self.query_one("#content-switcher").current)
         if selector:
@@ -995,8 +1010,16 @@ class GogMailApp(App):
         return getattr(self, "_clipboard_local", "")
 
     def copy_to_clipboard(self, text: str) -> None:
-        """Copy text to system clipboard (wl-copy or xclip)."""
+        """Copy text to system clipboard (OSC 52 + wl-copy/xclip/xsel).
+
+        OSC 52 reaches the terminal even over SSH and inside tmux (with
+        `set-clipboard on`); the subprocess copiers cover local sessions.
+        """
         self._clipboard_local = text
+        try:
+            super().copy_to_clipboard(text)
+        except Exception:
+            pass
         if "WAYLAND_DISPLAY" in os.environ:
             try:
                 subprocess.run(["wl-copy"], input=text.encode('utf-8'), check=True)

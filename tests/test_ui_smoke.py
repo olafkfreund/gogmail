@@ -123,5 +123,21 @@ class TestUiSmoke(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(ran, [True])
 
 
+    async def test_paste_inserts_clipboard_into_focused_input(self):
+        from gogmail.app import GogMailApp
+        app = GogMailApp()
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
+            with mock.patch.object(GogMailApp, "clipboard",
+                                   new_callable=mock.PropertyMock,
+                                   return_value="pasted@x.example"):
+                box = app.query_one("#email-search-input")
+                box.focus()
+                await pilot.pause()
+                app.action_paste_clipboard()
+                await pilot.pause()
+                self.assertIn("pasted@x.example", box.value)
+
+
 if __name__ == "__main__":
     unittest.main()
