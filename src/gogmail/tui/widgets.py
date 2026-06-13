@@ -5,6 +5,7 @@ from gogmail.gog_api import GogAPI
 from gogmail import images
 from gogmail.llm import get_provider
 from gogmail.zoom_api import ZoomAPI
+from gogmail import images
 import asyncio
 import base64
 import calendar
@@ -1220,6 +1221,7 @@ class DriveTab(Vertical):
         )
         yield Horizontal(
             Button("New Folder", variant="success", id="drive-mkdir-btn"),
+            Button("Preview", variant="primary", id="drive-preview-btn"),
             Button("View", variant="primary", id="drive-view-btn"),
             Button("Share", variant="primary", id="drive-share-btn"),
             Button("Rename", variant="primary", id="drive-rename-btn"),
@@ -1229,7 +1231,11 @@ class DriveTab(Vertical):
             Button("Delete", variant="error", id="drive-del-btn"),
             classes="btn-row"
         )
-        yield DataTable(id="drive-table")
+        yield Horizontal(
+            DataTable(id="drive-table"),
+            RichLog(id="drive-preview", highlight=True, markup=True, wrap=True, min_width=0),
+            id="drive-content-row"
+        )
 
     def on_mount(self):
         table = self.query_one("#drive-table")
@@ -1274,9 +1280,52 @@ class DriveTab(Vertical):
         except Exception as e:
             self.post_message(StatusNotification(f"Could not open browser: {e}", is_error=True))
 
+    # Preview width in half-block cells. The pane is 40fr of the content row;
+    # ~50 columns keeps rendered images small enough not to flood the RichLog.
+    PREVIEW_COLS = 50
+
+    def _preview_file(self, file_id: str, file_name: str):
+        """Show the selected file inline in #drive-preview. Images are
+        downloaded and rendered as half-blocks; other files get a text
+        summary. The download runs in a worker so the UI never blocks."""
+        f = next((x for x in getattr(self, "files_data", []) if x.get("id") == file_id), {})
+        preview = self.query_one("#drive-preview")
+        preview.clear()
+        mime = f.get("mimeType", "")
+
+        if not mime.startswith("image/"):
+            # Non-image: cheap metadata summary, no download needed.
+            preview.write(Text(file_name or "(file)"))
+            preview.write(f"[dim]Type:[/dim] {mime or 'unknown'}")
+            preview.write(f"[dim]Size:[/dim] {human_size(f.get('size'))}")
+            return
+
+        preview.write("[dim]Loading preview…[/dim]")
+        # Private per-download dir (0700): a fixed /tmp/<name> path is
+        # predictable and writable by other local users.
+        temp_dir = tempfile.mkdtemp(prefix="gogmail-")
+        temp_path = os.path.join(temp_dir, file_name or "image")
+        self.app.register_temp_file(temp_path)
+
+        async def run_preview():
+            success, err = await GogAPI.drive_download(file_id, temp_path)
+            preview.clear()
+            if not success:
+                preview.write(f"[dim]Preview failed: {err}[/dim]")
+                return
+            rendered = images.render_image(temp_path, max_cols=self.PREVIEW_COLS, max_rows=24)
+            if rendered is None:
+                preview.write(Text(file_name or "(image)"))
+                preview.write("[dim](Could not render image preview.)[/dim]")
+                return
+            preview.write(rendered)
+            preview.write(Text(file_name or "(image)"))
+
+        self.run_worker(run_preview())
+
     async def on_button_pressed(self, event: Button.Pressed):
         table = self.query_one("#drive-table")
-        
+
         if event.button.id == "drive-mkdir-btn":
             self.app.open_drive_mkdir_dialog()
             return
@@ -1294,7 +1343,9 @@ class DriveTab(Vertical):
         file_name = next(
             (f.get("name") for f in getattr(self, "files_data", []) if f.get("id") == file_id), "")
         
-        if event.button.id == "drive-share-btn":
+        if event.button.id == "drive-preview-btn":
+            self._preview_file(file_id, file_name)
+        elif event.button.id == "drive-share-btn":
             self.app.open_drive_share_dialog(file_id, file_name)
         elif event.button.id == "drive-rename-btn":
             self.app.open_drive_rename_dialog(file_id, file_name)
