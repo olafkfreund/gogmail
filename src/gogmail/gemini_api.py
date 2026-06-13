@@ -11,7 +11,7 @@ class GeminiAPI:
         if not api_key:
             return "Error: GEMINI_API_KEY environment variable is not set."
 
-        model = os.environ.get("GEMINI_MODEL_DEFAULT", "gemini-2.5-flash")
+        model = os.environ.get("GEMINI_MODEL_DEFAULT", "gemini-3.5-flash")
         # Key goes in a header, never the URL: requests exception strings include
         # the URL, which would leak the key into gogmail.log.
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"

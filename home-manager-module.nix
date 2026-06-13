@@ -39,7 +39,7 @@ in
 
     defaultModel = mkOption {
       type = types.str;
-      default = "gemini-2.5-flash";
+      default = "gemini-3.5-flash";
       description = "GEMINI_MODEL_DEFAULT environment variable.";
     };
 
@@ -52,23 +52,68 @@ in
         this only sets the starting account.
       '';
     };
+
+    zoomAccountId = mkOption {
+      type = types.nullOr types.str;
+      default = null;
+      description = ''
+        Zoom Server-to-Server OAuth Account ID ($GOG_ZOOM_ACCOUNT_ID). An
+        identifier, not a secret. Needed for the Zoom tab's "Create Meeting".
+      '';
+    };
+
+    zoomClientId = mkOption {
+      type = types.nullOr types.str;
+      default = null;
+      description = ''
+        Zoom Server-to-Server OAuth Client ID ($GOG_ZOOM_CLIENT_ID). An
+        identifier, not a secret.
+      '';
+    };
+
+    zoomClientSecretFile = mkOption {
+      type = types.nullOr types.path;
+      default = null;
+      example = literalExpression "config.age.secrets.zoom-client-secret.path";
+      description = ''
+        Path to a file containing the Zoom Client Secret (e.g. an agenix/sops
+        secret). Read at runtime via a wrapper, so it never enters the
+        world-readable Nix store. Preferred over zoomClientSecret.
+      '';
+    };
+
+    zoomClientSecret = mkOption {
+      type = types.nullOr types.str;
+      default = null;
+      description = ''
+        Zoom Client Secret as a literal string. NOT secret-safe: written to the
+        world-readable Nix store. Prefer zoomClientSecretFile.
+      '';
+    };
   };
 
   config = mkIf cfg.enable (
     let
-      # When a key file is provided, wrap the binary so it reads the secret at
-      # runtime instead of baking it into the store.
+      # Secrets that must be read at runtime (never baked into the store) are
+      # exported by a thin wrapper. Each entry is one `--run` export line.
+      runtimeExports =
+        optional (cfg.geminiApiKeyFile != null)
+          ''export GEMINI_API_KEY="$(cat ${toString cfg.geminiApiKeyFile})"''
+        ++ optional (cfg.zoomClientSecretFile != null)
+          ''export GOG_ZOOM_CLIENT_SECRET="$(cat ${toString cfg.zoomClientSecretFile})"'';
+
       finalPackage =
-        if cfg.geminiApiKeyFile != null then
-          pkgs.symlinkJoin {
-            name = "gogmail-wrapped";
-            paths = [ cfg.package ];
-            nativeBuildInputs = [ pkgs.makeWrapper ];
-            postBuild = ''
-              wrapProgram $out/bin/gogmail \
-                --run 'export GEMINI_API_KEY="$(cat ${toString cfg.geminiApiKeyFile})"'
-            '';
-          }
+        if runtimeExports != [ ] then
+          pkgs.symlinkJoin
+            {
+              name = "gogmail-wrapped";
+              paths = [ cfg.package ];
+              nativeBuildInputs = [ pkgs.makeWrapper ];
+              postBuild = ''
+                wrapProgram $out/bin/gogmail \
+                  ${concatMapStringsSep " \\\n  " (e: "--run ${escapeShellArg e}") runtimeExports}
+              '';
+            }
         else cfg.package;
     in
     {
@@ -78,13 +123,22 @@ in
         { GEMINI_MODEL_DEFAULT = cfg.defaultModel; }
         (mkIf (cfg.geminiApiKey != null) { GEMINI_API_KEY = cfg.geminiApiKey; })
         (mkIf (cfg.defaultAccount != null) { GOG_ACCOUNT = cfg.defaultAccount; })
+        (mkIf (cfg.zoomAccountId != null) { GOG_ZOOM_ACCOUNT_ID = cfg.zoomAccountId; })
+        (mkIf (cfg.zoomClientId != null) { GOG_ZOOM_CLIENT_ID = cfg.zoomClientId; })
+        (mkIf (cfg.zoomClientSecret != null) { GOG_ZOOM_CLIENT_SECRET = cfg.zoomClientSecret; })
       ];
 
-      warnings = optional (cfg.geminiApiKey != null) ''
-        programs.gogmail.geminiApiKey writes your API key into the world-readable
-        Nix store. Use programs.gogmail.geminiApiKeyFile (e.g. an agenix secret)
-        instead.
-      '';
+      warnings =
+        optional (cfg.geminiApiKey != null) ''
+          programs.gogmail.geminiApiKey writes your API key into the world-readable
+          Nix store. Use programs.gogmail.geminiApiKeyFile (e.g. an agenix secret)
+          instead.
+        ''
+        ++ optional (cfg.zoomClientSecret != null) ''
+          programs.gogmail.zoomClientSecret writes your Zoom client secret into the
+          world-readable Nix store. Use programs.gogmail.zoomClientSecretFile (e.g.
+          an agenix secret) instead.
+        '';
     }
   );
 }

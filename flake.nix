@@ -105,24 +105,39 @@
           // pkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
             nixos-module = pkgs.testers.runNixOSTest {
               name = "gogmail-nixos-module";
-              nodes.machine = { ... }: {
+              nodes.machine = { pkgs, ... }: {
                 imports = [ self.nixosModules.gogmail ];
                 programs.gogmail = {
                   enable = true;
                   package = gogmail;
-                  defaultModel = "gemini-2.5-flash";
+                  defaultModel = "gemini-3.5-flash";
+                  zoomAccountId = "acct-test";
+                  zoomClientId = "client-test";
+                  # A stand-in "secret" file the runtime wrapper must read.
+                  zoomClientSecretFile = pkgs.writeText "zoom-secret" "s3cr3t-zoom";
                 };
               };
               testScript = ''
                 machine.wait_for_unit("multi-user.target")
                 # The module installs the binary system-wide.
                 gogmail = machine.succeed("command -v gogmail").strip()
-                # It is the wrapped binary with gogcli (gog) on its PATH.
-                machine.succeed(f"grep -q gogcli $(readlink -f {gogmail})")
-                # The module exports the configured default model for sessions
-                # (grep the generated file rather than sourcing it, which trips
-                # over unrelated unbound vars under a strict shell).
-                machine.succeed("grep -q gemini-2.5-flash /etc/set-environment")
+                wrapper = machine.succeed(f"readlink -f {gogmail}").strip()
+                # The base package wires gogcli (gog) onto PATH. (With a secret
+                # file the install is double-wrapped, so check the base wrapper
+                # directly rather than the outer secret wrapper.)
+                machine.succeed("grep -q gogcli ${gogmail}/bin/gogmail")
+                # Non-secret session vars are exported (grep the generated file
+                # rather than sourcing it, which trips over unbound vars under a
+                # strict shell).
+                machine.succeed("grep -q gemini-3.5-flash /etc/set-environment")
+                machine.succeed("grep -q acct-test /etc/set-environment")
+                machine.succeed("grep -q client-test /etc/set-environment")
+                # The Zoom client secret is read from the file at runtime by the
+                # wrapper, NOT baked into the store: the outer wrapper exports
+                # GOG_ZOOM_CLIENT_SECRET, and the literal secret never appears in
+                # the session-vars file.
+                machine.succeed(f"grep -q GOG_ZOOM_CLIENT_SECRET {wrapper}")
+                machine.fail("grep -q s3cr3t-zoom /etc/set-environment")
               '';
             };
           };

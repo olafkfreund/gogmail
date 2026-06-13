@@ -73,7 +73,7 @@ programs.gogmail = {
   
   # Configuration parameters (propagated as environment variables)
   geminiApiKey = "AIzaSy..."; # Your Gemini API key
-  defaultModel = "gemini-2.5-flash"; # Default Gemini model
+  defaultModel = "gemini-3.5-flash"; # Default Gemini model
   defaultAccount = "your-email@example.com"; # Default Google Workspace account
 };
 ```
@@ -91,7 +91,7 @@ store**. Prefer `geminiApiKeyFile`, which is read at runtime via a wrapper:
 programs.gogmail = {
   enable = true;
   geminiApiKeyFile = config.age.secrets.gemini-api-key.path; # agenix/sops
-  defaultModel = "gemini-2.5-flash";
+  defaultModel = "gemini-3.5-flash";
 };
 ```
 
@@ -107,10 +107,32 @@ imports = [ gogmail.homeManagerModules.default ];
 programs.gogmail = {
   enable = true;
   geminiApiKeyFile = config.age.secrets.gemini-api-key.path;
-  defaultModel = "gemini-2.5-flash";
+  defaultModel = "gemini-3.5-flash";
   # defaultAccount left unset → switch accounts in-app
 };
 ```
+
+### Zoom meeting creation (optional)
+
+To enable the Zoom tab's **Create Meeting** button, supply Server-to-Server
+OAuth credentials (the app must have a `meeting:write` scope). The account and
+client IDs are plain identifiers; the client secret should come from a secret
+file so it never lands in the world-readable store:
+
+```nix
+programs.gogmail = {
+  enable = true;
+  geminiApiKeyFile = config.age.secrets.gemini-api-key.path;
+
+  zoomAccountId = "abcd1234";              # identifier, not secret
+  zoomClientId = "efgh5678";               # identifier, not secret
+  zoomClientSecretFile = config.age.secrets.zoom-client-secret.path; # agenix/sops
+};
+```
+
+These map to `GOG_ZOOM_ACCOUNT_ID` / `GOG_ZOOM_CLIENT_ID` /
+`GOG_ZOOM_CLIENT_SECRET` (the same names the `gog` CLI accepts). The same three
+options exist on the Home Manager module.
 
 ## 4. Running the Application
 
