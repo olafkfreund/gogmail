@@ -28,8 +28,9 @@ rm -rf dist/_pyz && python3 -c "import zipfile; zipfile.ZipFile('dist/gogmail.py
 syft dir:dist/_pyz/site-packages -o cyclonedx-json=dist/gogmail.cdx.json -o spdx-json=dist/gogmail.spdx.json -q
 python3 - <<'PY'
 import json
-c = json.load(open("dist/gogmail.cdx.json"))["components"]
-reqs = sorted(f"{x['name']}=={x['version']}" for x in c if x["name"] != "gogmail")
+c = json.load(open("dist/gogmail.cdx.json")).get("components", [])
+reqs = sorted(f"{x['name']}=={x['version']}" for x in c
+              if x.get("name") and x["name"] != "gogmail" and x.get("version"))
 open("dist/requirements.lock.txt", "w").write("\n".join(reqs) + "\n")
 PY
 
