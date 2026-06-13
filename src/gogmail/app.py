@@ -41,7 +41,8 @@ def get_config_path() -> str:
 def load_config() -> dict:
     """Load persisted settings, falling back to sensible defaults."""
     defaults = {"theme": DEFAULT_THEME, "ai_width": 40, "account": "",
-                "voice_input": False, "spoken_replies": False}
+                "voice_input": False, "spoken_replies": False,
+                "tts_engine": "auto", "tts_voice": "Kore"}
     path = get_config_path()
     if os.path.exists(path):
         try:
@@ -395,6 +396,20 @@ def _build_system_instruction(tools) -> str:
 SYSTEM_INSTRUCTION = _build_system_instruction(TOOLS)
 
 
+async def _speak_reply(config, text: str) -> None:
+    """Speak an assistant reply. 'auto' uses Gemini's natural TTS (same API key)
+    and falls back to a local engine; 'system' forces the local engine."""
+    engine = (config or {}).get("tts_engine", "auto")
+    if engine in ("auto", "gemini") and os.environ.get("GEMINI_API_KEY"):
+        voice_name = (config or {}).get("tts_voice", "Kore")
+        wav = await GeminiAPI.synthesize_speech(text, voice_name)
+        if wav and await asyncio.to_thread(voice.play_wav, wav):
+            return
+        if engine == "gemini":
+            return  # explicit choice: don't fall back to the robotic engine
+    await asyncio.to_thread(voice.speak, text)
+
+
 def _extract_tool_call(response_text: str):
     """Pull a tool-call dict out of a model response, tolerant of fence variants.
 
@@ -563,6 +578,9 @@ class AIAssistantPanel(Vertical):
         event.input.value = ""
         await self.submit_prompt(event.value)
 
+    async def _speak(self, text: str) -> None:
+        await _speak_reply(self.app.config, text)
+
     async def submit_prompt(self, prompt: str):
         """Run one assistant turn for `prompt` (typed or transcribed from voice)."""
         if not prompt:
@@ -598,7 +616,7 @@ class AIAssistantPanel(Vertical):
                 if tool_data is None:
                     log.write(f"[bold green]Gemini:[/bold green] {rich_escape(response_text)}")
                     if self.app.config.get("spoken_replies"):
-                        await asyncio.to_thread(voice.speak, response_text)
+                        await self._speak(response_text)
                     return
 
                 tool_name = tool_data.get("tool") or tool_data.get("tool_name") or tool_data.get("tool_code")

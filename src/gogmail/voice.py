@@ -27,13 +27,53 @@ _RECORDERS = [
 ]
 
 # Text-to-speech engines in preference order; the text is appended as the final
-# argument. All speak asynchronously when spawned with Popen.
+# argument. All speak asynchronously when spawned with Popen. (These are the
+# local fallback — the natural-sounding default is Gemini TTS, played as WAV.)
 _TTS = [
     ("espeak-ng", ["espeak-ng"]),
     ("espeak", ["espeak"]),
     ("spd-say", ["spd-say"]),
     ("say", ["say"]),  # macOS
 ]
+
+# WAV players for Gemini TTS output, in preference order.
+_PLAYERS = [
+    ("paplay", ["paplay"]),
+    ("aplay", ["aplay", "-q"]),
+    ("ffplay", ["ffplay", "-autoexit", "-nodisp", "-loglevel", "quiet"]),
+    ("play", ["play", "-q"]),  # sox
+]
+
+
+def detect_player():
+    """Return the WAV-player command template (list) or None if none installed."""
+    for name, cmd in _PLAYERS:
+        if shutil.which(name):
+            return cmd
+    return None
+
+
+def play_wav(data: bytes, command=None) -> bool:
+    """Play WAV bytes via a local player. Blocking — call from a worker thread."""
+    if not data:
+        return False
+    template = command or detect_player()
+    if not template:
+        return False
+    fd, path = tempfile.mkstemp(suffix=".wav", prefix="gogmail-tts-")
+    try:
+        os.write(fd, data)
+        os.close(fd)
+        subprocess.run(template + [path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return True
+    except Exception as e:
+        logging.error(f"voice: wav playback failed: {e}")
+        return False
+    finally:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
 
 
 def detect_recorder():

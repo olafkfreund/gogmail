@@ -130,10 +130,16 @@ class SettingsScreen(ModalScreen):
                 value=bool(self._settings.get("spoken_replies", False)),
                 id="set-spoken-replies",
             ),
+            Checkbox(
+                "Use the natural cloud voice (Gemini TTS) — uncheck for the offline system voice",
+                value=self._settings.get("tts_engine", "auto") != "system",
+                id="set-natural-voice",
+            ),
             Label(
                 "Voice input records your microphone and sends the clip to Gemini "
-                "to transcribe. Requires a recorder (pw-record/arecord/ffmpeg/sox); "
-                "spoken replies require a TTS engine (espeak-ng/spd-say/say).",
+                "to transcribe (needs pw-record/arecord/ffmpeg/sox). Spoken replies "
+                "use Gemini's natural voice by default, played via aplay/ffplay; "
+                "the offline fallback is espeak-ng/spd-say/say.",
                 classes="settings-hint",
             ),
             Horizontal(
@@ -149,6 +155,7 @@ class SettingsScreen(ModalScreen):
             self.dismiss({
                 "voice_input": self.query_one("#set-voice-input", Checkbox).value,
                 "spoken_replies": self.query_one("#set-spoken-replies", Checkbox).value,
+                "tts_engine": "auto" if self.query_one("#set-natural-voice", Checkbox).value else "system",
             })
         else:
             self.dismiss(None)

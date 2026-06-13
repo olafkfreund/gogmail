@@ -1,4 +1,8 @@
 import os
+import re
+import io
+import wave
+import base64
 import requests
 import asyncio
 import logging
@@ -83,6 +87,56 @@ class GeminiAPI:
     async def generate_chat(cls, contents: list, system_instruction: str = None) -> str:
         """Call Gemini API for multi-turn chat asynchronously using a thread pool."""
         return await asyncio.to_thread(cls._generate_chat_sync, contents, system_instruction)
+
+    @staticmethod
+    def _pcm_to_wav(pcm: bytes, rate: int = 24000) -> bytes:
+        """Wrap raw 16-bit mono PCM (what Gemini TTS returns) in a WAV container."""
+        buf = io.BytesIO()
+        with wave.open(buf, "wb") as w:
+            w.setnchannels(1)
+            w.setsampwidth(2)
+            w.setframerate(rate)
+            w.writeframes(pcm)
+        return buf.getvalue()
+
+    @staticmethod
+    def _synthesize_sync(text: str, voice: str) -> bytes:
+        api_key = os.environ.get("GEMINI_API_KEY")
+        if not api_key or not text.strip():
+            return None
+        # gemini-3.1 is the newest TTS preview; override with GEMINI_TTS_MODEL.
+        model = os.environ.get("GEMINI_TTS_MODEL", "gemini-3.1-flash-tts-preview")
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+        payload = {
+            "contents": [{"parts": [{"text": text}]}],
+            "generationConfig": {
+                "responseModalities": ["AUDIO"],
+                "speechConfig": {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": voice}}},
+            },
+        }
+        try:
+            resp = requests.post(url, json=payload, timeout=40, headers={"x-goog-api-key": api_key})
+            if resp.status_code != 200:
+                logging.error(f"Gemini TTS error {resp.status_code}: {resp.text[:200]}")
+                return None
+            parts = (resp.json().get("candidates") or [{}])[0].get("content", {}).get("parts", [])
+            for p in parts:
+                inline = p.get("inlineData") or p.get("inline_data")
+                if inline and inline.get("data"):
+                    pcm = base64.b64decode(inline["data"])
+                    mt = inline.get("mimeType") or inline.get("mime_type") or ""
+                    m = re.search(r"rate=(\d+)", mt)
+                    return GeminiAPI._pcm_to_wav(pcm, int(m.group(1)) if m else 24000)
+            return None
+        except Exception as e:
+            logging.error(f"Gemini TTS exception: {e}")
+            return None
+
+    @classmethod
+    async def synthesize_speech(cls, text: str, voice: str = "Kore") -> bytes:
+        """Natural TTS via Gemini. Returns WAV bytes, or None on any failure
+        (caller falls back to a local engine)."""
+        return await asyncio.to_thread(cls._synthesize_sync, text, voice)
 
     @classmethod
     async def transcribe_audio(cls, audio_bytes: bytes, mime_type: str = "audio/wav") -> str:

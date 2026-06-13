@@ -9,6 +9,12 @@ from gogmail import voice
 from gogmail.gemini_api import GeminiAPI
 
 
+def _async(value):
+    async def f(*a, **k):
+        return value
+    return f
+
+
 class TestDetection(unittest.TestCase):
     def test_recorder_detection_prefers_first_available(self):
         def which(name):
@@ -101,6 +107,86 @@ class TestTranscribe(unittest.TestCase):
         part = seen["contents"][0]["parts"][0]
         self.assertEqual(part["inline_data"]["mime_type"], "audio/wav")
         self.assertTrue(part["inline_data"]["data"])  # base64 payload present
+
+
+class TestGeminiTTS(unittest.TestCase):
+    def test_pcm_to_wav_is_valid_wav(self):
+        import wave, io
+        pcm = b"\x00\x01" * 1000
+        wav = GeminiAPI._pcm_to_wav(pcm, 24000)
+        w = wave.open(io.BytesIO(wav), "rb")
+        self.assertEqual(w.getnchannels(), 1)
+        self.assertEqual(w.getframerate(), 24000)
+        self.assertEqual(w.getsampwidth(), 2)
+
+    def test_synthesize_returns_wav_from_inline_audio(self):
+        import base64
+
+        class _R:
+            status_code = 200
+            def json(self):
+                return {"candidates": [{"content": {"parts": [
+                    {"inlineData": {"mimeType": "audio/L16;rate=24000",
+                                    "data": base64.b64encode(b"\x00\x01" * 500).decode()}}]}}]}
+
+        with mock.patch.dict("os.environ", {"GEMINI_API_KEY": "k"}), \
+                mock.patch("gogmail.gemini_api.requests.post", return_value=_R()):
+            wav = asyncio.run(GeminiAPI.synthesize_speech("hi", "Kore"))
+        self.assertTrue(wav and wav[:4] == b"RIFF")
+
+    def test_synthesize_none_without_key(self):
+        with mock.patch.dict("os.environ", {}, clear=False):
+            os.environ.pop("GEMINI_API_KEY", None)
+            self.assertIsNone(asyncio.run(GeminiAPI.synthesize_speech("hi")))
+
+
+class TestPlayWav(unittest.TestCase):
+    def test_play_wav_noop_without_player(self):
+        with mock.patch("gogmail.voice.detect_player", return_value=None):
+            self.assertFalse(voice.play_wav(b"RIFFxxxx"))
+
+    def test_play_wav_invokes_player(self):
+        calls = []
+        with mock.patch("gogmail.voice.detect_player", return_value=["aplay", "-q"]), \
+                mock.patch("gogmail.voice.subprocess.run",
+                           side_effect=lambda cmd, **k: calls.append(cmd[0])):
+            self.assertTrue(voice.play_wav(b"RIFFxxxx"))
+        self.assertEqual(calls[0], "aplay")
+
+    def test_play_wav_empty_is_false(self):
+        self.assertFalse(voice.play_wav(b""))
+
+
+class TestSpeakRouting(unittest.IsolatedAsyncioTestCase):
+    async def test_auto_uses_gemini_then_plays(self):
+        from gogmail.app import _speak_reply
+        syn = mock.AsyncMock(return_value=b"RIFFwav")
+        with mock.patch.dict("os.environ", {"GEMINI_API_KEY": "k"}), \
+                mock.patch.object(GeminiAPI, "synthesize_speech", syn), \
+                mock.patch("gogmail.app.voice.play_wav", return_value=True) as play, \
+                mock.patch("gogmail.app.voice.speak") as local:
+            await _speak_reply({"tts_engine": "auto"}, "hello")
+        syn.assert_called_once()
+        play.assert_called_once()
+        local.assert_not_called()
+
+    async def test_system_engine_uses_local(self):
+        from gogmail.app import _speak_reply
+        syn = mock.AsyncMock(return_value=b"x")
+        with mock.patch.object(GeminiAPI, "synthesize_speech", syn), \
+                mock.patch("gogmail.app.voice.speak") as local:
+            await _speak_reply({"tts_engine": "system"}, "hello")
+        syn.assert_not_called()
+        local.assert_called_once()
+
+    async def test_auto_falls_back_to_local_when_gemini_fails(self):
+        from gogmail.app import _speak_reply
+        with mock.patch.dict("os.environ", {"GEMINI_API_KEY": "k"}), \
+                mock.patch.object(GeminiAPI, "synthesize_speech", mock.AsyncMock(return_value=None)), \
+                mock.patch("gogmail.app.voice.play_wav", return_value=False), \
+                mock.patch("gogmail.app.voice.speak") as local:
+            await _speak_reply({"tts_engine": "auto"}, "hello")
+        local.assert_called_once()
 
 
 if __name__ == "__main__":
