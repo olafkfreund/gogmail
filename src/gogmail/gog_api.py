@@ -450,9 +450,24 @@ class GogAPI:
 
     @staticmethod
     async def sheets_update(spreadsheet_id: str, range_name: str, values: list[list[str]]) -> bool:
-        # values format: nested JSON values
-        values_str = json.dumps(values)
-        success, _ = await run_gog(["sheets", "update", spreadsheet_id, range_name, values_str])
+        # `gog sheets update` takes the 2D values via --values-json (positional
+        # values are the comma/pipe text form, which can't hold arbitrary cells).
+        success, _ = await run_gog(
+            ["sheets", "update", spreadsheet_id, range_name, "--values-json", json.dumps(values)])
+        return success
+
+    @staticmethod
+    async def sheets_set_cell(spreadsheet_id: str, cell: str, value: str) -> bool:
+        # Single A1 cell update (e.g. cell="B3"). One row, one cell.
+        return await GogAPI.sheets_update(spreadsheet_id, cell, [[value]])
+
+    @staticmethod
+    async def sheets_append_row(spreadsheet_id: str, values: list[str]) -> bool:
+        # `gog sheets append <id> <range>` adds a new row after the existing
+        # data; range "A1" anchors it to the first table. One row of cells.
+        success, _ = await run_gog(
+            ["sheets", "append", spreadsheet_id, "A1",
+             "--values-json", json.dumps([list(values)])])
         return success
 
     @staticmethod
