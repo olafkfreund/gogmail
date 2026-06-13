@@ -227,7 +227,11 @@ class CalendarCreateScreen(ModalScreen):
         p = self.prefill
         editing = bool(p)
         yield Vertical(
-            Label("Edit Calendar Event" if editing else "Create Calendar Event", classes="dialog-title"),
+            Horizontal(
+                Label("Edit Calendar Event" if editing else "Create Calendar Event", classes="dialog-title"),
+                Button("⛶ Fullscreen", id="cal-fullscreen-btn", classes="compose-win-btn"),
+                classes="compose-titlebar",
+            ),
             Label("Summary / Title:"),
             Input(value=p.get("summary", ""), placeholder="Event Title", id="event-summary"),
             Label("Start Time (RFC3339, e.g. 2026-06-11T10:00:00Z):"),
@@ -243,13 +247,19 @@ class CalendarCreateScreen(ModalScreen):
                 Button("Cancel", id="cancel-btn"),
                 classes="btn-row"
             ),
-            id="dialog-container"
+            id="calendar-create-container",
+            classes="side-panel",
         )
 
     def on_mount(self):
         self.query_one("#event-summary").focus()
 
     def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "cal-fullscreen-btn":
+            container = self.query_one("#calendar-create-container")
+            container.toggle_class("fullscreen")
+            event.button.label = "⛶ Restore" if container.has_class("fullscreen") else "⛶ Fullscreen"
+            return
         if event.button.id == "create-btn":
             summary = self.query_one("#event-summary").value
             start = self.query_one("#event-start").value
@@ -279,7 +289,12 @@ class GmailComposeScreen(ModalScreen):
     def compose(self):
         title = "Reply to Email" if self.thread_id else "Compose Email"
         yield Vertical(
-            Label(title, classes="dialog-title"),
+            # Title bar with a Gmail-style fullscreen toggle.
+            Horizontal(
+                Label(title, classes="dialog-title"),
+                Button("⛶ Fullscreen", id="compose-fullscreen-btn", classes="compose-win-btn"),
+                classes="compose-titlebar",
+            ),
             Label("To:"),
             Input(value=self.to_default, placeholder="recipient@example.com", id="email-to"),
             Label("Subject:"),
@@ -298,7 +313,8 @@ class GmailComposeScreen(ModalScreen):
                 Button("Cancel", id="cancel-btn"),
                 classes="btn-row"
             ),
-            id="gmail-compose-container"
+            id="gmail-compose-container",
+            classes="side-panel",
         )
 
     def on_mount(self):
@@ -318,6 +334,12 @@ class GmailComposeScreen(ModalScreen):
             self.query_one("#email-to", Input).suggester = ContactSuggester(suggestions)
 
     async def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "compose-fullscreen-btn":
+            # Toggle between the right-docked panel and full width.
+            container = self.query_one("#gmail-compose-container")
+            container.toggle_class("fullscreen")
+            event.button.label = "⛶ Restore" if container.has_class("fullscreen") else "⛶ Fullscreen"
+            return
         if event.button.id == "cancel-btn":
             self.dismiss(None)
         elif event.button.id in ("send-btn", "save-draft-btn"):

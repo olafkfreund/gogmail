@@ -353,10 +353,39 @@ Button {
     align: center middle;
 }
 
-#gmail-compose-container {
+/* Compose and Calendar dock to the right (Gmail-web style) over a low-alpha
+   backdrop, so the workspace stays visible behind; the titlebar button toggles
+   full width. */
+GmailComposeScreen, CalendarCreateScreen {
+    align: right top;
+    /* Low-alpha backdrop composites the workspace below, so you can still
+       follow the inbox/threads behind the docked panel. */
+    background: $background 25%;
+}
+
+.side-panel {
     padding: 1 2;
-    width: 100%;
+    width: 50%;
     height: 100%;
+}
+
+.side-panel.fullscreen {
+    width: 100%;
+}
+
+.compose-titlebar {
+    height: 3;
+    width: 100%;
+}
+
+.compose-titlebar .dialog-title {
+    width: 1fr;
+    content-align: left middle;
+}
+
+.compose-win-btn {
+    min-width: 14;
+    border: none;
 }
 
 .dialog-title {
@@ -476,7 +505,7 @@ Button {
     color: #b8bb26;
     border-left: solid #b8bb26;
 }
-.theme-gruvbox #dialog-container, .theme-gruvbox #gmail-compose-container {
+.theme-gruvbox #dialog-container, .theme-gruvbox .side-panel {
     background: #32302f;
     border: double #fabd2f;
 }
@@ -588,7 +617,7 @@ Button {
     color: #a6e3a1;
     border-left: solid #a6e3a1;
 }
-.theme-catppuccin #dialog-container, .theme-catppuccin #gmail-compose-container {
+.theme-catppuccin #dialog-container, .theme-catppuccin .side-panel {
     background: #181825;
     border: double #89b4fa;
 }
@@ -700,7 +729,7 @@ Button {
     color: #a3be8c;
     border-left: solid #a3be8c;
 }
-.theme-nord #dialog-container, .theme-nord #gmail-compose-container {
+.theme-nord #dialog-container, .theme-nord .side-panel {
     background: #3b4252;
     border: double #88c0d0;
 }
@@ -812,7 +841,7 @@ Button {
     color: #50fa7b;
     border-left: solid #50fa7b;
 }
-.theme-dracula #dialog-container, .theme-dracula #gmail-compose-container {
+.theme-dracula #dialog-container, .theme-dracula .side-panel {
     background: #1d1f27;
     border: double #bd93f9;
 }
@@ -924,7 +953,7 @@ Button {
     color: #a6e22e;
     border-left: solid #a6e22e;
 }
-.theme-monokai #dialog-container, .theme-monokai #gmail-compose-container {
+.theme-monokai #dialog-container, .theme-monokai .side-panel {
     background: #3e3d32;
     border: double #66d9ef;
 }
@@ -1036,7 +1065,7 @@ Button {
     color: #859900;
     border-left: solid #859900;
 }
-.theme-solarized #dialog-container, .theme-solarized #gmail-compose-container {
+.theme-solarized #dialog-container, .theme-solarized .side-panel {
     background: #073642;
     border: double #268bd2;
 }
