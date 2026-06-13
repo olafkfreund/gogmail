@@ -14,9 +14,9 @@ A modern, premium, feature-rich Terminal User Interface (TUI) client for Linux t
 ## Key Features
 
 - **Integrated Services**: Contains specialized dashboards for:
-  - **Gmail**: Read, search (**paginated — load more**), archive, trash, compose, reply, **star, apply labels, save drafts, and download attachments**; recipient autocomplete from contacts.
+  - **Gmail**: Read, search (**paginated — load more**), archive, trash, compose, reply, **star, apply labels, save drafts, download attachments, and view inline images** (embedded images shown in-client; remote images opt-in to block tracking pixels); recipient autocomplete from contacts.
   - **Calendar**: Agenda view, details panel, RSVP, create/**edit**/delete events, a **multi-calendar picker** and **free/busy** lookup. Compose/edit opens as a **right-docked panel with a fullscreen toggle**.
-  - **Drive**: Browse, search, upload, download, create folders, delete, **share, rename, and move**; click a file to open it in the browser.
+  - **Drive**: Browse, search, upload, download, create folders, delete, **share, rename, and move**; **inline image preview** pane; click a file to open it in the browser.
   - **Docs, Sheets, Slides, Forms**: Interactive lists, read/cat Docs, render Sheets in a grid with **inline cell editing and row append**, open in the browser, create new files.
   - **Meet**: Instantly create video conference spaces and copy links.
   - **Zoom**: **Create instant meetings** that launch your Zoom client, plus validate Server-to-Server OAuth.
@@ -26,7 +26,7 @@ A modern, premium, feature-rich Terminal User Interface (TUI) client for Linux t
   - **Keep**: List notes, create and delete them.
   - **Groups**: List your Google Groups and their members.
   - **Backup**: Export your account into an encrypted backup (`gog backup`) from the Settings page.
-  - **Photos · YouTube · Classroom · Sites**: read-only tabs. Photos/YouTube/Classroom each need their own Google API enabled, so they're **opt-in via Settings** (off by default); Sites is always on.
+  - **Photos · YouTube · Classroom · Sites**: read-only tabs (Photos shows **inline thumbnails**). Photos/YouTube/Classroom each need their own Google API enabled, so they're **opt-in via Settings** (off by default); Sites is always on.
 - **AI Integration (Gemini)**:
   - Toggleable, context-aware side panel — it sees the selected email, open doc, or task list.
   - **Agentic read + act tools**: "show me my latest emails", "what's on my calendar this week", "what are my open tasks", "find the doc about X", "draft a reply" — it fetches the data via `gog`, summarizes it, **and opens the matching client view** populated with the results.
