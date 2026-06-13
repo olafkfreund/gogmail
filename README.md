@@ -23,6 +23,9 @@ A modern, premium, feature-rich Terminal User Interface (TUI) client for Linux t
   - **Contacts & People**: Fast search and details card; **create, edit and delete** contacts; resolves real names in Chat.
   - **Tasks**: Multiple task lists; add, **edit, set due dates**, complete/incomplete, delete, and **clear completed**.
   - **Chat**: Real-time spaces listing, messages history (with real participant names), and sending text chats.
+  - **Keep**: List notes, create and delete them.
+  - **Groups**: List your Google Groups and their members.
+  - **Backup**: Export your account into an encrypted backup (`gog backup`) from the Settings page.
 - **AI Integration (Gemini)**:
   - Toggleable, context-aware side panel — it sees the selected email, open doc, or task list.
   - **Agentic read + act tools**: "show me my latest emails", "what's on my calendar this week", "what are my open tasks", "find the doc about X", "draft a reply" — it fetches the data via `gog`, summarizes it, **and opens the matching client view** populated with the results.
