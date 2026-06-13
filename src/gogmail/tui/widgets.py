@@ -2,7 +2,7 @@ from textual.widgets import Static, DataTable, Label, Input, Button, RichLog, Co
 from textual.containers import Vertical, Horizontal, Container
 from textual.message import Message
 from gogmail.gog_api import GogAPI
-from gogmail.gemini_api import GeminiAPI
+from gogmail.llm import get_provider
 from gogmail.zoom_api import ZoomAPI
 import asyncio
 import base64
@@ -580,7 +580,7 @@ class GmailTab(Vertical):
             body_view = self.query_one("#email-body-view")
             body_view.clear()
             body_view.write("[dim]Generating summary with Gemini…[/dim]")
-            summary = await GeminiAPI.summarize_email(
+            summary = await get_provider().summarize_email(
                 subject=headers.get("subject", ""),
                 sender=headers.get("from", ""),
                 # best_email_text handles HTML-only messages; the raw body
