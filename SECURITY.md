@@ -7,8 +7,8 @@ Please upgrade to the most recent version before reporting a vulnerability.
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 1.3.x   | :white_check_mark: |
-| < 1.3   | :x:                |
+| 1.4.x   | :white_check_mark: |
+| < 1.4   | :x:                |
 
 ## Reporting a vulnerability
 
@@ -50,6 +50,21 @@ long-lived signing key that could leak. Before installing, verify both the
 checksums and the signature as described in
 [`PACKAGING.md`](PACKAGING.md#verifying-before-you-trust). **If verification fails, do not
 install.**
+
+### Repository history & screenshots
+
+Early showcase screenshots briefly contained real personal data. They were
+**replaced with synthetic `.example` data and the original blobs removed from
+reachable history** (reset + force-push) before wide distribution. The current
+`main` branch and **every release tag (v1.0.0–v1.4.0) contain only the synthetic
+screenshots**, and the local repository has been pruned of all unreachable
+objects (`git reflog expire --expire=now --all && git gc --prune=now`).
+
+Git objects that became unreachable on the remote are not exposed through normal
+clone/fetch and are reachable only by an exact, undiscoverable SHA; GitHub
+garbage-collects such orphans over time. To force their immediate removal from
+GitHub's storage, the repository owner can ask GitHub Support to run `git gc` on
+the server (this is the only way — it cannot be triggered by a push).
 
 ## Scope
 
