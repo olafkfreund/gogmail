@@ -24,6 +24,35 @@ layout: default
   </div>
 </section>
 
+<section id="demo">
+  <div class="wrap">
+    <h2>Demo</h2>
+    <p class="section-sub">A live tour of the Gruvbox Dark interface — it cycles automatically.</p>
+    <div class="demo-stage">
+      <div class="demo-bar">
+        <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+        <span class="title mono">~/gogmail — nix run github:olafkfreund/gogmail</span>
+      </div>
+      <div class="demo-frames">
+        {% assign demo = "inbox|✉️  Gmail inbox + Gemini panel,calendar-month|📅  Calendar · month view,drive|📁  Google Drive files,tasks-detail|✓  Google Tasks,chat|💬  Google Chat spaces" | split: "," %}
+        {% for d in demo %}
+          {% assign parts = d | split: "|" %}
+          <figure>
+            <img src="{{ '/assets/img/' | append: parts[0] | append: '.png' | relative_url }}" alt="{{ parts[1] }}" loading="lazy">
+            <figcaption>{{ parts[1] }}</figcaption>
+          </figure>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="demo-dots" aria-hidden="true">
+      <span></span><span></span><span></span><span></span><span></span>
+    </div>
+    <p style="text-align:center; margin-top:1.2rem;">
+      <a class="btn btn-ghost" href="{{ '/#screenshots' | relative_url }}">Browse all screenshots</a>
+    </p>
+  </div>
+</section>
+
 <section id="what">
   <div class="wrap">
     <h2>What it is</h2>
