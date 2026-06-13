@@ -236,6 +236,23 @@
     height: 100%;
 }
 
+/* Keep View */
+#keep-content-row {
+    layout: horizontal;
+    height: 1fr;
+}
+
+#keep-table {
+    width: 50fr;
+    height: 100%;
+}
+
+#keep-detail {
+    width: 50fr;
+    height: 100%;
+    padding: 1;
+}
+
 /* Chat View */
 #chat-split {
     layout: horizontal;
@@ -442,6 +459,7 @@ GmailComposeScreen, CalendarCreateScreen {
 .theme-gruvbox #sheet-grid,
 .theme-gruvbox #chat-message-pane,
 .theme-gruvbox #contact-detail,
+.theme-gruvbox #keep-detail,
 .theme-gruvbox #tasks-table {
     background: #32302f;
     border-left: solid #504945;
@@ -554,6 +572,7 @@ GmailComposeScreen, CalendarCreateScreen {
 .theme-catppuccin #sheet-grid,
 .theme-catppuccin #chat-message-pane,
 .theme-catppuccin #contact-detail,
+.theme-catppuccin #keep-detail,
 .theme-catppuccin #tasks-table {
     background: #181825;
     border-left: solid #313244;
@@ -666,6 +685,7 @@ GmailComposeScreen, CalendarCreateScreen {
 .theme-nord #sheet-grid,
 .theme-nord #chat-message-pane,
 .theme-nord #contact-detail,
+.theme-nord #keep-detail,
 .theme-nord #tasks-table {
     background: #3b4252;
     border-left: solid #4c566a;
@@ -778,6 +798,7 @@ GmailComposeScreen, CalendarCreateScreen {
 .theme-dracula #sheet-grid,
 .theme-dracula #chat-message-pane,
 .theme-dracula #contact-detail,
+.theme-dracula #keep-detail,
 .theme-dracula #tasks-table {
     background: #1d1f27;
     border-left: solid #44475a;
@@ -890,6 +911,7 @@ GmailComposeScreen, CalendarCreateScreen {
 .theme-monokai #sheet-grid,
 .theme-monokai #chat-message-pane,
 .theme-monokai #contact-detail,
+.theme-monokai #keep-detail,
 .theme-monokai #tasks-table {
     background: #3e3d32;
     border-left: solid #49483e;
@@ -1002,6 +1024,7 @@ GmailComposeScreen, CalendarCreateScreen {
 .theme-solarized #sheet-grid,
 .theme-solarized #chat-message-pane,
 .theme-solarized #contact-detail,
+.theme-solarized #keep-detail,
 .theme-solarized #tasks-table {
     background: #073642;
     border-left: solid #586e75;

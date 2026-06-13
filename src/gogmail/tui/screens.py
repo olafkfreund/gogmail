@@ -298,6 +298,36 @@ class TaskCreateScreen(ModalScreen):
         else:
             self.dismiss(None)
 
+class KeepCreateScreen(ModalScreen):
+    """Modal screen for creating a Google Keep note (title + body text)."""
+    def compose(self):
+        yield Vertical(
+            Label("New Note", classes="dialog-title"),
+            Label("Title:"),
+            Input(placeholder="Note title", id="keep-title"),
+            Label("Text:"),
+            TextArea("", id="keep-text", classes="multi-line-input"),
+            Horizontal(
+                Button("Add", variant="success", id="add-btn"),
+                Button("Cancel", id="cancel-btn"),
+                classes="btn-row"
+            ),
+            id="dialog-container"
+        )
+
+    def on_mount(self):
+        self.query_one("#keep-title").focus()
+
+    def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "add-btn":
+            self.dismiss({
+                "title": self.query_one("#keep-title").value.strip(),
+                "text": self.query_one("#keep-text").text,
+            })
+        else:
+            self.dismiss(None)
+
+
 class CalendarCreateScreen(ModalScreen):
     """Modal screen for creating or editing a Google Calendar event."""
     def __init__(self, calendar_id: str = "primary", prefill: dict = None):

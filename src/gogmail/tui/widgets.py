@@ -1884,3 +1884,102 @@ class ChatTab(Vertical):
                 await self.refresh_messages()
             else:
                 self.post_message(StatusNotification("Failed to send message."))
+
+
+# --- KEEP TAB ---
+class KeepTab(Vertical):
+    """Google Keep notes: a list of notes (title + snippet) with a detail pane."""
+    def compose(self):
+        yield Horizontal(
+            Label(" Google Keep ", classes="view-header"),
+            Horizontal(
+                Button("New Note", variant="success", id="keep-new-btn"),
+                Button("Delete Note", variant="error", id="keep-del-btn"),
+                Button("Refresh", id="keep-ref-btn"),
+                classes="header-buttons"
+            ),
+            classes="view-header-row"
+        )
+        yield Horizontal(
+            DataTable(id="keep-table"),
+            RichLog(id="keep-detail", highlight=True, markup=True, wrap=True, min_width=0),
+            id="keep-content-row"
+        )
+
+    def on_mount(self):
+        table = self.query_one("#keep-table")
+        table.cursor_type = "row"
+        table.add_columns("Title", "Snippet")
+
+    @staticmethod
+    def _note_text(note: dict) -> str:
+        """Body text of a note (handles flat `text`/`body` and nested shapes)."""
+        return note.get("text") or note.get("body") or note.get("textContent") or ""
+
+    async def refresh_notes(self):
+        self.post_message(StatusNotification("Loading notes..."))
+        table = self.query_one("#keep-table")
+        table.clear()
+
+        notes = await GogAPI.keep_list()
+        self.notes_data = notes
+
+        for n in notes:
+            note_id = n.get("id") or n.get("name") or ""
+            title = n.get("title") or "(Untitled)"
+            snippet = self._note_text(n).replace("\n", " ")
+            if len(snippet) > 60:
+                snippet = snippet[:57] + "..."
+            table.add_row(title, snippet, key=note_id)
+
+        self.post_message(StatusNotification(f"Loaded {len(notes)} notes."))
+
+    def _selected_note(self) -> dict:
+        table = self.query_one("#keep-table")
+        if table.cursor_row is None or not getattr(self, "notes_data", None):
+            return {}
+        note_id = table.ordered_rows[table.cursor_row].key.value
+        return next(
+            (n for n in self.notes_data if (n.get("id") or n.get("name")) == note_id),
+            {},
+        )
+
+    async def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "keep-ref-btn":
+            await self.refresh_notes()
+        elif event.button.id == "keep-new-btn":
+            self.app.open_keep_create_dialog()
+        elif event.button.id == "keep-del-btn":
+            note = self._selected_note()
+            if not note:
+                self.post_message(StatusNotification("Select a note first.", is_error=True))
+                return
+            note_id = note.get("id") or note.get("name") or ""
+            title = note.get("title") or "(Untitled)"
+
+            async def do_delete():
+                await GogAPI.keep_delete(note_id)
+                self.post_message(StatusNotification("Note deleted."))
+                await self.refresh_notes()
+            self.app.confirm(f"Delete note “{title}”?", do_delete)
+
+    async def on_data_table_row_selected(self, event: DataTable.RowSelected):
+        note = self._selected_note()
+        log = self.query_one("#keep-detail")
+        log.clear()
+        if not note:
+            return
+        title = rich_escape(note.get("title") or "(Untitled)")
+        log.write(f"[bold magenta]{title}[/bold magenta]\n")
+        body = self._note_text(note)
+        if body:
+            log.write(rich_escape(body))
+        for item in note.get("items") or note.get("listItems") or []:
+            if isinstance(item, dict):
+                checked = item.get("checked")
+                mark = "[x]" if checked else "[ ]"
+                text = rich_escape(item.get("text", ""))
+                log.write(f"{mark} {text}")
+        note_id = note.get("id") or note.get("name") or ""
+        if note_id:
+            log.write(f"\n[dim]ID: {rich_escape(note_id)}[/dim]")

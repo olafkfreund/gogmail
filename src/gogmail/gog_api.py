@@ -767,3 +767,25 @@ class GogAPI:
     async def chat_send_message(space_id: str, text: str) -> bool:
         success, _ = await run_gog(["chat", "messages", "send", space_id, "--text", text])
         return success
+
+    # --- Keep (Notes) ---
+    @staticmethod
+    async def keep_list() -> list:
+        success, res = await run_gog(["keep", "list"])
+        return _extract_list(success, res, "notes")
+
+    @staticmethod
+    async def keep_create(title: str, text: str = "") -> tuple[bool, str]:
+        args = ["keep", "create"]
+        if title:
+            args += ["--title", title]
+        if text:
+            args += ["--text", text]
+        success, res = await run_gog(args)
+        return success, _str_result(res)
+
+    @staticmethod
+    async def keep_delete(note_id: str) -> bool:
+        # --force: the TUI confirms destructive ops itself, so skip gog's prompt.
+        success, _ = await run_gog(["keep", "delete", note_id, "--force"])
+        return success
