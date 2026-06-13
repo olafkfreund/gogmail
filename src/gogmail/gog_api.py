@@ -548,11 +548,30 @@ class GogAPI:
         return _extract_list(success, res, "tasks")
 
     @staticmethod
-    async def tasks_add(tasklist_id: str, title: str, notes: str = "") -> bool:
+    async def tasks_add(tasklist_id: str, title: str, notes: str = "", due: str = "") -> bool:
         args = ["tasks", "add", tasklist_id, "--title", title]
         if notes:
             args.extend(["--notes", notes])
+        if due:
+            args.extend(["--due", due])
         success, _ = await run_gog(args)
+        return success
+
+    @staticmethod
+    async def tasks_edit(tasklist_id: str, task_id: str, title: str = None,
+                         notes: str = None, due: str = None) -> tuple[bool, str]:
+        """Update a task. Only non-None fields are changed (pass "" to clear)."""
+        args = ["tasks", "update", tasklist_id, task_id]
+        for flag, value in (("--title", title), ("--notes", notes), ("--due", due)):
+            if value is not None:
+                args += [flag, value]
+        success, res = await run_gog(args)
+        return success, _str_result(res)
+
+    @staticmethod
+    async def tasks_clear_completed(tasklist_id: str) -> bool:
+        """Clear all completed tasks from a list."""
+        success, _ = await run_gog(["tasks", "clear", tasklist_id])
         return success
 
     @staticmethod

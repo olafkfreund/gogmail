@@ -192,20 +192,29 @@ class PromptDialog(ModalScreen):
             self.dismiss(None)
 
 class TaskCreateScreen(ModalScreen):
-    """Modal screen for creating a new Google Task."""
-    def __init__(self, tasklist_id: str):
+    """Modal screen for creating or editing a Google Task.
+
+    Pass a prefill dict (title/notes/due) to open in edit mode, mirroring
+    CalendarCreateScreen.
+    """
+    def __init__(self, tasklist_id: str, prefill: dict = None):
         super().__init__()
         self.tasklist_id = tasklist_id
+        self.prefill = prefill or {}
 
     def compose(self):
+        p = self.prefill
+        editing = bool(p)
         yield Vertical(
-            Label("Add New Task", classes="dialog-title"),
+            Label("Edit Task" if editing else "Add New Task", classes="dialog-title"),
             Label("Title:"),
-            Input(placeholder="Task title", id="task-title"),
+            Input(value=p.get("title", ""), placeholder="Task title", id="task-title"),
             Label("Notes:"),
-            TextArea(id="task-notes", classes="multi-line-input"),
+            TextArea(p.get("notes", ""), id="task-notes", classes="multi-line-input"),
+            Label("Due date (YYYY-MM-DD, optional):"),
+            Input(value=p.get("due", ""), placeholder="2026-06-13", id="task-due"),
             Horizontal(
-                Button("Add", variant="success", id="add-btn"),
+                Button("Save" if editing else "Add", variant="success", id="add-btn"),
                 Button("Cancel", id="cancel-btn"),
                 classes="btn-row"
             ),
@@ -219,7 +228,8 @@ class TaskCreateScreen(ModalScreen):
         if event.button.id == "add-btn":
             title = self.query_one("#task-title").value
             notes = self.query_one("#task-notes").text
-            self.dismiss({"title": title, "notes": notes})
+            due = self.query_one("#task-due").value
+            self.dismiss({"title": title, "notes": notes, "due": due})
         else:
             self.dismiss(None)
 
