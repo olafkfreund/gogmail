@@ -243,6 +243,11 @@ class GogAPI:
         return _extract_list(success, res, "labels")
 
     @staticmethod
+    async def gmail_labels_create(name: str) -> tuple[bool, str]:
+        success, res = await run_gog(["gmail", "labels", "create", name])
+        return success, _str_result(res)
+
+    @staticmethod
     async def gmail_modify_labels(thread_id: str, add: str = "", remove: str = "") -> bool:
         """Add/remove labels (comma-separated names or IDs) on a thread."""
         args = ["gmail", "labels", "modify", thread_id]

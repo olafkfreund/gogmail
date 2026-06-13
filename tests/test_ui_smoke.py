@@ -194,6 +194,37 @@ class TestUiSmoke(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(captured, ["show me my latest emails"])
                 self.assertEqual(str(mic.label), "Talk")
 
+    async def test_label_picker_moves_and_returns_to_inbox(self):
+        from gogmail.app import GogMailApp, GmailTab
+        app = GogMailApp()
+        async with app.run_test(size=(140, 45)) as pilot:
+            await pilot.pause()
+            gt = app.query_one(GmailTab)
+            await gt.set_query("label:INBOX")
+            await pilot.pause()
+            gt.query_one("#gmail-switcher").current = "gmail-detail-view"
+            calls = {}
+            async def fake_modify(tid, add="", remove=""):
+                calls.update(add=add, remove=remove); return True
+            with mock.patch.object(GogAPI, "gmail_modify_labels", side_effect=fake_modify):
+                await app._apply_label("t1", {"label": "Work", "move": True, "create": False})
+            self.assertEqual(calls, {"add": "Work", "remove": "INBOX"})
+            # A moved conversation leaves the inbox -> back to the list view.
+            self.assertEqual(gt.query_one("#gmail-switcher").current, "gmail-list-view")
+
+    async def test_label_picker_creates_new_label_then_applies(self):
+        from gogmail.app import GogMailApp
+        app = GogMailApp()
+        async with app.run_test(size=(140, 45)) as pilot:
+            await pilot.pause()
+            created = []
+            async def fake_create(name):
+                created.append(name); return True, ""
+            with mock.patch.object(GogAPI, "gmail_labels_create", side_effect=fake_create), \
+                    mock.patch.object(GogAPI, "gmail_modify_labels", _async(True)):
+                await app._apply_label("t1", {"label": "Receipts", "move": False, "create": True})
+            self.assertEqual(created, ["Receipts"])
+
     async def test_command_palette_opens_with_gogmail_provider(self):
         from textual.command import CommandPalette
         from gogmail.app import GogMailApp, GogMailCommands

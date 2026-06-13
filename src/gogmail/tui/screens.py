@@ -1,5 +1,5 @@
 from textual.screen import ModalScreen
-from textual.widgets import Input, Button, Label, TextArea, Checkbox
+from textual.widgets import Input, Button, Label, TextArea, Checkbox, OptionList
 from textual.containers import Vertical, Horizontal
 from textual.suggester import Suggester
 from gogmail.gemini_api import GeminiAPI
@@ -54,6 +54,60 @@ class ConfirmDialog(ModalScreen):
 
     def on_button_pressed(self, event: Button.Pressed):
         self.dismiss(event.button.id == "confirm-btn")
+
+
+class GmailLabelScreen(ModalScreen):
+    """Pick a label/folder for a thread from the existing list, or create one.
+
+    Dismisses with {"label": name, "move": bool, "create": bool} or None.
+    "move" also removes the thread from the Inbox (Gmail's move-to-folder).
+    """
+    def __init__(self, labels: list):
+        super().__init__()
+        self._labels = labels or []
+
+    def compose(self):
+        yield Vertical(
+            Label("Label / Move conversation", classes="dialog-title"),
+            Label("Choose an existing label:" if self._labels else "No labels yet — create one below."),
+            OptionList(*self._labels, id="label-list"),
+            Checkbox("Move here (also remove from Inbox)", value=False, id="label-move"),
+            Label("…or create a new label:"),
+            Input(placeholder="New label name", id="new-label"),
+            Horizontal(
+                Button("Apply", variant="success", id="label-apply-btn"),
+                Button("Create & apply", variant="primary", id="label-create-btn"),
+                Button("Cancel", id="cancel-btn"),
+                classes="btn-row",
+            ),
+            id="dialog-container",
+        )
+
+    def on_mount(self):
+        if self._labels:
+            self.query_one("#label-list", OptionList).focus()
+        else:
+            self.query_one("#new-label", Input).focus()
+
+    def _move(self) -> bool:
+        return self.query_one("#label-move", Checkbox).value
+
+    def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "label-apply-btn":
+            ol = self.query_one("#label-list", OptionList)
+            idx = ol.highlighted
+            if idx is None or idx < 0 or idx >= len(self._labels):
+                self.app.notify("Select a label, or use Create & apply.", severity="warning")
+                return
+            self.dismiss({"label": self._labels[idx], "move": self._move(), "create": False})
+        elif event.button.id == "label-create-btn":
+            name = self.query_one("#new-label", Input).value.strip()
+            if not name:
+                self.app.notify("Enter a name for the new label.", severity="warning")
+                return
+            self.dismiss({"label": name, "move": self._move(), "create": True})
+        else:
+            self.dismiss(None)
 
 
 class SettingsScreen(ModalScreen):

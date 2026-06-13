@@ -20,7 +20,7 @@ from gogmail.tui.widgets import (
     TasksTab, ChatTab, StatusNotification
 )
 from gogmail.tui.screens import (
-    ConfirmDialog, PromptDialog, SettingsScreen, TaskCreateScreen,
+    ConfirmDialog, GmailLabelScreen, PromptDialog, SettingsScreen, TaskCreateScreen,
     CalendarCreateScreen, GmailComposeScreen, ThemeSelectScreen, THEMES
 )
 from gogmail.gog_api import GogAPI, set_error_sink, set_account
@@ -902,12 +902,46 @@ class GogMailApp(App):
         self.push_screen(GmailComposeScreen(to, subject, body, thread_id, reply_to_message_id), handle_dismiss)
 
     def open_gmail_label_dialog(self, thread_id: str):
-        self._open_prompt(
-            "Apply Label", "Label name (e.g. Receipts, Work)",
-            lambda v: GogAPI.gmail_modify_labels(thread_id, add=v),
-            "Applying label...", "Label applied.",
-            lambda: self.query_one(GmailTab).refresh_emails(),
-        )
+        async def load_and_show():
+            labels = await GogAPI.gmail_labels_list()
+            names = [l.get("name") for l in labels
+                     if l.get("type") == "user" and l.get("name")]
+
+            def handle(result):
+                if not result:
+                    return
+                self.run_worker(self._apply_label(thread_id, result))
+
+            self.push_screen(GmailLabelScreen(names), handle)
+
+        self.run_worker(load_and_show())
+
+    async def _apply_label(self, thread_id: str, result: dict) -> None:
+        name = result.get("label")
+        if not name:
+            return
+        moving = result.get("move")
+        verb = "Moving" if moving else "Applying label"
+        self.notify_status(f"{verb}…")
+        if result.get("create"):
+            ok, err = await GogAPI.gmail_labels_create(name)
+            if not ok:
+                self.notify_status(f"Failed to create label: {err}", error=True)
+                return
+        ok = await GogAPI.gmail_modify_labels(
+            thread_id, add=name, remove="INBOX" if moving else "")
+        if not ok:
+            self.notify_status("Failed to update labels.", error=True)
+            return
+        self.notify_status(f"Moved to {name}." if moving else f"Labeled {name}.")
+        gmail = self.query_one(GmailTab)
+        # A moved conversation has left the inbox — go back to the list.
+        if moving:
+            try:
+                gmail.query_one("#gmail-switcher").current = "gmail-list-view"
+            except Exception:
+                pass
+        await gmail.refresh_emails()
 
     def open_calendar_create_dialog(self):
         async def handle_dismiss(result):
