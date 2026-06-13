@@ -14,10 +14,10 @@ A modern, premium, feature-rich Terminal User Interface (TUI) client for Linux t
 ## Key Features
 
 - **Integrated Services**: Contains specialized dashboards for:
-  - **Gmail**: Read, search, archive, trash, compose, reply, **star, apply labels, save drafts, and download attachments**; recipient autocomplete from contacts.
-  - **Calendar**: Agenda view, details panel, RSVP responses, create, **edit** and delete events. Compose/edit opens as a **right-docked panel with a fullscreen toggle**.
+  - **Gmail**: Read, search (**paginated — load more**), archive, trash, compose, reply, **star, apply labels, save drafts, and download attachments**; recipient autocomplete from contacts.
+  - **Calendar**: Agenda view, details panel, RSVP, create/**edit**/delete events, a **multi-calendar picker** and **free/busy** lookup. Compose/edit opens as a **right-docked panel with a fullscreen toggle**.
   - **Drive**: Browse, search, upload, download, create folders, delete, **share, rename, and move**; click a file to open it in the browser.
-  - **Docs, Sheets, Slides, Forms**: Interactive lists, read/cat Docs, render Sheets inside a grid/table, open in the browser, create new documents/spreadsheets/presentations/forms.
+  - **Docs, Sheets, Slides, Forms**: Interactive lists, read/cat Docs, render Sheets in a grid with **inline cell editing and row append**, open in the browser, create new files.
   - **Meet**: Instantly create video conference spaces and copy links.
   - **Zoom**: **Create instant meetings** that launch your Zoom client, plus validate Server-to-Server OAuth.
   - **Contacts & People**: Fast search and details card; **create, edit and delete** contacts; resolves real names in Chat.
@@ -27,6 +27,7 @@ A modern, premium, feature-rich Terminal User Interface (TUI) client for Linux t
   - Toggleable, context-aware side panel — it sees the selected email, open doc, or task list.
   - **Agentic read + act tools**: "show me my latest emails", "what's on my calendar this week", "what are my open tasks", "find the doc about X", "draft a reply" — it fetches the data via `gog`, summarizes it, **and opens the matching client view** populated with the results.
   - Email composing helper that writes replies/drafts directly from your instructions.
+  - **Write-action tools**: save a draft, star/label an email, share a file, edit an event, switch account, create a task list — all by asking.
   - **Voice control** (optional): push-to-talk mic button transcribes speech to drive the assistant, with optional **spoken replies** in Google's natural Gemini TTS voice (espeak fallback). Toggle both in the new **Settings** page.
 - **Visual Aesthetics**: Clean, responsive layout with six switchable themes; emoji-free single-width sidebar glyphs for crisp alignment.
 
