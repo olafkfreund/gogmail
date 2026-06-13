@@ -1,5 +1,5 @@
 from textual.screen import ModalScreen
-from textual.widgets import Input, Button, Label, TextArea
+from textual.widgets import Input, Button, Label, TextArea, Checkbox
 from textual.containers import Vertical, Horizontal
 from textual.suggester import Suggester
 from gogmail.gemini_api import GeminiAPI
@@ -54,6 +54,50 @@ class ConfirmDialog(ModalScreen):
 
     def on_button_pressed(self, event: Button.Pressed):
         self.dismiss(event.button.id == "confirm-btn")
+
+
+class SettingsScreen(ModalScreen):
+    """Preferences page. Dismisses with the updated settings dict, or None."""
+    def __init__(self, settings: dict):
+        super().__init__()
+        self._settings = settings or {}
+
+    def compose(self):
+        yield Vertical(
+            Label("Settings", classes="dialog-title"),
+            Label("Voice & Speech", classes="settings-section"),
+            Checkbox(
+                "Enable voice input (push-to-talk mic button)",
+                value=bool(self._settings.get("voice_input", False)),
+                id="set-voice-input",
+            ),
+            Checkbox(
+                "Speak assistant replies (text-to-speech)",
+                value=bool(self._settings.get("spoken_replies", False)),
+                id="set-spoken-replies",
+            ),
+            Label(
+                "Voice input records your microphone and sends the clip to Gemini "
+                "to transcribe. Requires a recorder (pw-record/arecord/ffmpeg/sox); "
+                "spoken replies require a TTS engine (espeak-ng/spd-say/say).",
+                classes="settings-hint",
+            ),
+            Horizontal(
+                Button("Save", variant="success", id="settings-save-btn"),
+                Button("Cancel", id="cancel-btn"),
+                classes="btn-row",
+            ),
+            id="dialog-container",
+        )
+
+    def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "settings-save-btn":
+            self.dismiss({
+                "voice_input": self.query_one("#set-voice-input", Checkbox).value,
+                "spoken_replies": self.query_one("#set-spoken-replies", Checkbox).value,
+            })
+        else:
+            self.dismiss(None)
 
 
 class PromptDialog(ModalScreen):

@@ -288,9 +288,31 @@
     padding: 1;
 }
 
+#ai-input-row {
+    height: 3;
+    layout: horizontal;
+}
+
 #ai-input {
     height: 3;
+    width: 1fr;
     border: none;
+}
+
+#ai-mic-btn {
+    height: 3;
+    min-width: 8;
+    border: none;
+}
+
+.settings-section {
+    text-style: bold;
+    margin-top: 1;
+}
+
+.settings-hint {
+    margin-top: 1;
+    opacity: 70%;
 }
 
 .ai-message {

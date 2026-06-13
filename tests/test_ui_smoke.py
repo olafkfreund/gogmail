@@ -1,6 +1,7 @@
 """Headless UI smoke tests: mount the real app with mocked gog data and verify
 core flows don't crash and render content."""
 import asyncio
+import os
 import unittest
 from unittest import mock
 
@@ -130,6 +131,68 @@ class TestUiSmoke(unittest.IsolatedAsyncioTestCase):
                 text = "".join(str(s) for s in log.lines)
                 self.assertIn("zoom.us/j/42", text)
                 opened.assert_called_once_with("https://zoom.us/s/42")
+
+    async def test_settings_screen_saves_and_toggles_mic_button(self):
+        from gogmail.app import GogMailApp, AIAssistantPanel
+        from gogmail.tui.screens import SettingsScreen
+        from textual.widgets import Checkbox
+        base = {"theme": "gruvbox", "ai_width": 40, "account": "",
+                "voice_input": False, "spoken_replies": False}
+        with mock.patch("gogmail.app.load_config", return_value=dict(base)), \
+                mock.patch("gogmail.app.save_config"):
+            app = GogMailApp()
+            async with app.run_test(size=(140, 45)) as pilot:
+                await pilot.pause()
+                mic = app.query_one(AIAssistantPanel).query_one("#ai-mic-btn")
+                self.assertFalse(bool(mic.display))  # hidden until enabled
+                app.open_settings_dialog()
+                await pilot.pause()
+                self.assertIsInstance(app.screen, SettingsScreen)
+                app.screen.query_one("#set-voice-input", Checkbox).value = True
+                app.screen.query_one("#settings-save-btn").press()
+                await pilot.pause()
+                self.assertTrue(app.config["voice_input"])
+                self.assertTrue(bool(mic.display))  # appears after enabling
+
+    async def test_voice_button_transcribes_and_submits(self):
+        import tempfile
+        from gogmail.app import GogMailApp, AIAssistantPanel
+        from gogmail.gemini_api import GeminiAPI
+
+        class FakeRecorder:
+            def __init__(self): self._rec = False
+            @property
+            def recording(self): return self._rec
+            def start(self): self._rec = True; return True
+            def stop(self):
+                self._rec = False
+                fd, p = tempfile.mkstemp(suffix=".wav")
+                os.write(fd, b"RIFF" + b"\x00" * 64)
+                os.close(fd)
+                return p
+
+        base = {"theme": "gruvbox", "ai_width": 40, "account": "",
+                "voice_input": True, "spoken_replies": False}
+        with mock.patch("gogmail.app.load_config", return_value=dict(base)), \
+                mock.patch("gogmail.app.save_config"):
+            app = GogMailApp()
+            async with app.run_test(size=(140, 45)) as pilot:
+                await pilot.pause()
+                panel = app.query_one(AIAssistantPanel)
+                panel._recorder = FakeRecorder()
+                captured = []
+                async def fake_submit(p): captured.append(p)
+                panel.submit_prompt = fake_submit
+                mic = panel.query_one("#ai-mic-btn")
+                with mock.patch.object(GeminiAPI, "transcribe_audio",
+                                       _async("show me my latest emails")):
+                    mic.press()            # start recording
+                    await pilot.pause()
+                    self.assertEqual(str(mic.label), "Stop")
+                    mic.press()            # stop -> transcribe -> submit
+                    await pilot.pause(0.3)
+                self.assertEqual(captured, ["show me my latest emails"])
+                self.assertEqual(str(mic.label), "Talk")
 
     async def test_command_palette_opens_with_gogmail_provider(self):
         from textual.command import CommandPalette

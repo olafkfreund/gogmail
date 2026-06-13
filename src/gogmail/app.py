@@ -20,11 +20,12 @@ from gogmail.tui.widgets import (
     TasksTab, ChatTab, StatusNotification
 )
 from gogmail.tui.screens import (
-    ConfirmDialog, PromptDialog, TaskCreateScreen, CalendarCreateScreen,
-    GmailComposeScreen, ThemeSelectScreen, THEMES
+    ConfirmDialog, PromptDialog, SettingsScreen, TaskCreateScreen,
+    CalendarCreateScreen, GmailComposeScreen, ThemeSelectScreen, THEMES
 )
 from gogmail.gog_api import GogAPI, set_error_sink, set_account
 from gogmail.gemini_api import GeminiAPI
+from gogmail import voice
 
 DEFAULT_THEME = "gruvbox"
 BADGE = "Created using Claude Code"
@@ -39,7 +40,8 @@ def get_config_path() -> str:
 
 def load_config() -> dict:
     """Load persisted settings, falling back to sensible defaults."""
-    defaults = {"theme": DEFAULT_THEME, "ai_width": 40, "account": ""}
+    defaults = {"theme": DEFAULT_THEME, "ai_width": 40, "account": "",
+                "voice_input": False, "spoken_replies": False}
     path = get_config_path()
     if os.path.exists(path):
         try:
@@ -315,13 +317,63 @@ class AIAssistantPanel(Vertical):
     def compose(self):
         yield Label(" Gemini ", id="ai-header")
         yield RichLog(id="ai-chat-history", highlight=True, markup=True, wrap=True, min_width=0)
-        yield Input(placeholder="Ask Gemini anything... (e.g. 'draft a reply')", id="ai-input")
+        yield Horizontal(
+            Input(placeholder="Ask Gemini anything... (e.g. 'draft a reply')", id="ai-input"),
+            Button("Talk", id="ai-mic-btn"),
+            id="ai-input-row",
+        )
 
     def on_mount(self):
         log = self.query_one("#ai-chat-history")
         log.write("[bold green]Gemini Assistant Ready![/bold green]")
         log.write("I am context-aware. Type below to ask questions about your emails, documents, or tasks.")
         self.chat_history = []
+        self._recorder = voice.Recorder()
+        # Hidden by default; the app calls apply_settings() once config is loaded
+        # (this on_mount can run before the app sets self.config).
+        self.query_one("#ai-mic-btn").display = False
+
+    def apply_settings(self):
+        """Show/hide the push-to-talk mic button per the voice_input setting."""
+        try:
+            self.query_one("#ai-mic-btn").display = bool(getattr(self.app, "config", {}).get("voice_input", False))
+        except Exception:
+            pass
+
+    async def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id != "ai-mic-btn":
+            return
+        btn = event.button
+        if not self._recorder.recording:
+            if not self._recorder.start():
+                self.app.notify_status(
+                    "No microphone recorder found (install pw-record, arecord, ffmpeg or sox).",
+                    error=True)
+                return
+            btn.label = "Stop"
+            self.app.notify_status("Listening… click Stop when you're done speaking.")
+            return
+        # Stop, transcribe, then feed the transcript through the normal pipeline.
+        btn.label = "Talk"
+        path = await asyncio.to_thread(self._recorder.stop)
+        if not path:
+            self.app.notify_status("No audio captured.", error=True)
+            return
+        self.app.notify_status("Transcribing…")
+        try:
+            with open(path, "rb") as f:
+                audio = f.read()
+        finally:
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+        text = await GeminiAPI.transcribe_audio(audio)
+        text = (text or "").strip()
+        if not text or text.startswith(("Error", "Exception")):
+            self.app.notify_status("Could not transcribe the audio.", error=True)
+            return
+        await self.submit_prompt(text)
 
     def _gather_context(self) -> str:
         """Pull a context blurb from whichever tab is currently active."""
@@ -350,13 +402,18 @@ class AIAssistantPanel(Vertical):
     async def on_input_submitted(self, event: Input.Submitted):
         if event.input.id != "ai-input":
             return
-        prompt = event.value
+        if not event.value:
+            return
+        event.input.value = ""
+        await self.submit_prompt(event.value)
+
+    async def submit_prompt(self, prompt: str):
+        """Run one assistant turn for `prompt` (typed or transcribed from voice)."""
         if not prompt:
             return
 
         log = self.query_one("#ai-chat-history")
         log.write(f"\n[bold yellow]You:[/bold yellow] {rich_escape(prompt)}")
-        event.input.value = ""
 
         now_str = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S%z")
         context_desc = self._gather_context()
@@ -387,6 +444,8 @@ class AIAssistantPanel(Vertical):
 
                 if tool_data is None:
                     log.write(f"[bold green]Gemini:[/bold green] {rich_escape(response_text)}")
+                    if self.app.config.get("spoken_replies"):
+                        await asyncio.to_thread(voice.speak, response_text)
                     return
 
                 tool_name = tool_data.get("tool") or tool_data.get("tool_name") or tool_data.get("tool_code")
@@ -427,6 +486,7 @@ class GogMailCommands(Provider):
             ("New Google Form", app.open_form_create_dialog, "Create a form"),
             ("New Drive folder", app.open_drive_mkdir_dialog, "Create a folder in Drive"),
             ("Upload file to Drive", app.open_drive_upload_dialog, "Upload a local file"),
+            ("Settings", app.open_settings_dialog, "Voice, speech and preferences"),
             ("Select theme", app.open_theme_dialog, "Switch the color theme"),
             ("Toggle sidebar", app.action_toggle_sidebar, "Show/hide the sidebar (F2)"),
             ("Toggle AI panel", app.action_toggle_ai, "Show/hide the Gemini drawer (F3)"),
@@ -537,6 +597,13 @@ class GogMailApp(App):
 
         self._build_sidebar()
 
+        # Apply voice/speech prefs now that config is loaded (the AI panel's own
+        # on_mount can run before this, so it defers the mic toggle to here).
+        try:
+            self.query_one(AIAssistantPanel).apply_settings()
+        except Exception:
+            pass
+
         # Verify gog is installed/authenticated and resolve the real account.
         self.run_worker(self._preflight(), exclusive=False)
 
@@ -572,6 +639,7 @@ class GogMailApp(App):
         self._accounts_node = tree.root.add("▪ Accounts", expand=True)
 
         settings = tree.root.add("▪ Settings", expand=True)
+        settings.add_leaf("• Preferences", data={"type": "settings"})
         settings.add_leaf("• Select Theme", data={"type": "select-theme"})
 
         tree.select_node(gmail.children[0])
@@ -685,6 +753,8 @@ class GogMailApp(App):
             await self.query_one(GmailTab).set_query(data.get("query", "label:INBOX"))
         elif node_type == "select-theme":
             self.open_theme_dialog()
+        elif node_type == "settings":
+            self.open_settings_dialog()
         elif node_type == "account":
             await self.switch_account(data.get("email"))
         elif node_type in TREE_VIEWS:
@@ -977,6 +1047,20 @@ class GogMailApp(App):
             "Creating form...", "Form created.",
             lambda: self.query_one(FormsTab).refresh_list(),
         )
+
+    def open_settings_dialog(self):
+        def handle_dismiss(result):
+            if not result:
+                return
+            self.config.update(result)
+            self.save_settings()
+            # Apply immediately: show/hide the mic button per the new setting.
+            try:
+                self.query_one(AIAssistantPanel).apply_settings()
+            except Exception:
+                pass
+            self.notify_status("Settings saved.")
+        self.push_screen(SettingsScreen(self.config), handle_dismiss)
 
     def open_theme_dialog(self):
         async def handle_dismiss(result):

@@ -37,6 +37,11 @@
             pkgs.xsel
             pkgs.xdg-utils
             pkgs.timg
+            # Voice: a mic recorder (arecord) + a fallback (ffmpeg), and a
+            # text-to-speech engine for spoken replies. All optional at runtime.
+            pkgs.alsa-utils
+            pkgs.ffmpeg
+            pkgs.espeak-ng
           ];
 
           gogmail = python.pkgs.buildPythonApplication {

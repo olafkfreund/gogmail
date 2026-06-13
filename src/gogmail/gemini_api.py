@@ -83,3 +83,20 @@ class GeminiAPI:
     async def generate_chat(cls, contents: list, system_instruction: str = None) -> str:
         """Call Gemini API for multi-turn chat asynchronously using a thread pool."""
         return await asyncio.to_thread(cls._generate_chat_sync, contents, system_instruction)
+
+    @classmethod
+    async def transcribe_audio(cls, audio_bytes: bytes, mime_type: str = "audio/wav") -> str:
+        """Transcribe recorded speech to text via inline audio (push-to-talk).
+
+        Reuses the same generateContent path/key as everything else; the clip is
+        sent inline (the API caps inline payloads at 20 MB, far above a short
+        utterance). Returns the transcript, or an "Error:"/"Exception:" string.
+        """
+        import base64
+        data = base64.b64encode(audio_bytes).decode("ascii")
+        contents = [{"parts": [
+            {"inline_data": {"mime_type": mime_type, "data": data}},
+            {"text": "Transcribe this audio verbatim. Output only the transcript text, "
+                     "with no preamble, quotes, or commentary."},
+        ]}]
+        return await asyncio.to_thread(cls._call_sync, contents, None)
