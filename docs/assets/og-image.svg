@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630" role="img" aria-label="GogMail TUI — Google Workspace in your terminal">
+  <!-- Gruvbox Dark palette -->
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="0%" r="75%">
+      <stop offset="0%" stop-color="#fabd2f" stop-opacity="0.14"/>
+      <stop offset="70%" stop-color="#282828" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1200" height="630" fill="#1d2021"/>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+
+  <!-- Brand mark: rounded square with envelope + terminal prompt -->
+  <g transform="translate(96 150)">
+    <rect width="160" height="160" rx="30" fill="#282828" stroke="#3c3836" stroke-width="2"/>
+    <g transform="translate(20 20) scale(1.875)">
+      <rect x="12" y="16" width="40" height="28" rx="3" fill="none" stroke="#fe8019" stroke-width="3"/>
+      <path d="M13 18 L32 33 L51 18" fill="none" stroke="#fe8019" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M20 50 L26 54 L20 58" fill="none" stroke="#b8bb26" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      <rect x="30" y="55" width="14" height="3.5" rx="1.5" fill="#ebdbb2"/>
+    </g>
+  </g>
+
+  <!-- Title + tagline -->
+  <g font-family="'JetBrains Mono', ui-monospace, monospace">
+    <text x="300" y="250" font-size="92" font-weight="700" fill="#ebdbb2">
+      <tspan fill="#fabd2f">Gog</tspan>Mail <tspan fill="#fabd2f">TUI</tspan>
+    </text>
+  </g>
+  <text x="302" y="320" font-family="'Inter', system-ui, sans-serif" font-size="40" fill="#a89984">
+    Google Workspace in your terminal
+  </text>
+
+  <!-- Mock terminal prompt line -->
+  <text x="302" y="392" font-family="'JetBrains Mono', ui-monospace, monospace" font-size="30" fill="#928374">
+    <tspan fill="#b8bb26">~/gogmail</tspan> <tspan fill="#8ec07c">$</tspan> <tspan fill="#ebdbb2">nix run</tspan> <tspan fill="#83a598">github:olafkfreund/gogmail</tspan>
+  </text>
+
+  <!-- Service chips -->
+  <g font-family="'JetBrains Mono', ui-monospace, monospace" font-size="26" fill="#8ec07c">
+    <g>
+      <rect x="302" y="440" width="148" height="48" rx="24" fill="#282828" stroke="#504945"/>
+      <text x="376" y="472" text-anchor="middle">Gmail</text>
+    </g>
+    <g>
+      <rect x="466" y="440" width="178" height="48" rx="24" fill="#282828" stroke="#504945"/>
+      <text x="555" y="472" text-anchor="middle">Calendar</text>
+    </g>
+    <g>
+      <rect x="660" y="440" width="140" height="48" rx="24" fill="#282828" stroke="#504945"/>
+      <text x="730" y="472" text-anchor="middle">Drive</text>
+    </g>
+    <g>
+      <rect x="816" y="440" width="172" height="48" rx="24" fill="#282828" stroke="#504945"/>
+      <text x="902" y="472" text-anchor="middle">Gemini</text>
+    </g>
+  </g>
+
+  <!-- accent baseline -->
+  <rect x="0" y="624" width="1200" height="6" fill="#fe8019"/>
+</svg>

@@ -139,6 +139,73 @@ section h2::before { content: "## "; color: var(--bg3); }
 .shot .cap b { color: var(--yellow); }
 .shot .cap span { display: block; color: var(--fg-dim); font-size: 0.88rem; }
 
+/* ===== Demo: auto-cycling slideshow (dependency-free) ===== */
+.demo-stage {
+  position: relative;
+  max-width: 860px;
+  margin: 0 auto;
+  background: var(--bg0-hard);
+  border: 1px solid var(--bg2);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+}
+/* fake terminal title bar */
+.demo-bar {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.55rem 0.9rem;
+  background: var(--bg1);
+  border-bottom: 1px solid var(--bg2);
+  font-family: "JetBrains Mono", monospace; font-size: 0.8rem; color: var(--fg-dim);
+}
+.demo-bar .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+.demo-bar .dot.r { background: var(--red); }
+.demo-bar .dot.y { background: var(--yellow); }
+.demo-bar .dot.g { background: var(--green); }
+.demo-bar .title { margin-left: 0.6rem; }
+
+.demo-frames {
+  position: relative;
+  /* preserve aspect ratio of the screenshots */
+  aspect-ratio: 16 / 10;
+  background: var(--bg0);
+}
+.demo-frames figure {
+  position: absolute; inset: 0; margin: 0;
+  opacity: 0;
+  animation: demoCycle 25s infinite;
+}
+.demo-frames img { width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block; }
+.demo-frames figcaption {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  padding: 0.6rem 1rem;
+  background: linear-gradient(transparent, rgba(29, 32, 33, 0.92));
+  font-family: "JetBrains Mono", monospace; font-size: 0.9rem; color: var(--yellow);
+}
+/* 5 frames → each visible 1/5 of the cycle, with a short cross-fade */
+.demo-frames figure:nth-child(1) { animation-delay: 0s; }
+.demo-frames figure:nth-child(2) { animation-delay: 5s; }
+.demo-frames figure:nth-child(3) { animation-delay: 10s; }
+.demo-frames figure:nth-child(4) { animation-delay: 15s; }
+.demo-frames figure:nth-child(5) { animation-delay: 20s; }
+
+@keyframes demoCycle {
+  0%   { opacity: 0; }
+  2%   { opacity: 1; }
+  18%  { opacity: 1; }
+  20%  { opacity: 0; }
+  100% { opacity: 0; }
+}
+
+.demo-dots { display: flex; justify-content: center; gap: 0.5rem; margin-top: 1rem; }
+.demo-dots span { width: 9px; height: 9px; border-radius: 50%; background: var(--bg3); display: inline-block; }
+
+@media (prefers-reduced-motion: reduce) {
+  .demo-frames figure { animation: none; }
+  /* show the first frame statically when motion is reduced */
+  .demo-frames figure:nth-child(1) { opacity: 1; }
+}
+
 /* why / steps */
 .steps { counter-reset: step; }
 .step { display: flex; gap: 1rem; margin-bottom: 1.2rem; }

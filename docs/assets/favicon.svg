@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="GogMail">
+  <!-- Gruvbox Dark: bg #282828, accent orange #fe8019, green #b8bb26, fg #ebdbb2 -->
+  <rect width="64" height="64" rx="12" fill="#282828"/>
+  <!-- Envelope -->
+  <rect x="12" y="16" width="40" height="28" rx="3" fill="none" stroke="#fe8019" stroke-width="3"/>
+  <path d="M13 18 L32 33 L51 18" fill="none" stroke="#fe8019" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Terminal prompt: green chevron + cursor -->
+  <path d="M20 50 L26 54 L20 58" fill="none" stroke="#b8bb26" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="30" y="55" width="14" height="3.5" rx="1.5" fill="#ebdbb2"/>
+</svg>
