@@ -14,14 +14,14 @@ A modern, premium, feature-rich Terminal User Interface (TUI) client for Linux t
 ## Key Features
 
 - **Integrated Services**: Contains specialized dashboards for:
-  - **Gmail**: Read, search, archive, trash, compose, reply, **star, apply labels, and save drafts**; recipient autocomplete from contacts.
+  - **Gmail**: Read, search, archive, trash, compose, reply, **star, apply labels, save drafts, and download attachments**; recipient autocomplete from contacts.
   - **Calendar**: Agenda view, details panel, RSVP responses, create, **edit** and delete events. Compose/edit opens as a **right-docked panel with a fullscreen toggle**.
   - **Drive**: Browse, search, upload, download, create folders, delete, **share, rename, and move**; click a file to open it in the browser.
   - **Docs, Sheets, Slides, Forms**: Interactive lists, read/cat Docs, render Sheets inside a grid/table, open in the browser, create new documents/spreadsheets/presentations/forms.
   - **Meet**: Instantly create video conference spaces and copy links.
   - **Zoom**: **Create instant meetings** that launch your Zoom client, plus validate Server-to-Server OAuth.
-  - **Contacts & People**: Fast search and details card for connections; resolves real names in Chat.
-  - **Tasks**: Checklists supporting multiple task lists, marking tasks complete/incomplete, adding and deleting.
+  - **Contacts & People**: Fast search and details card; **create, edit and delete** contacts; resolves real names in Chat.
+  - **Tasks**: Multiple task lists; add, **edit, set due dates**, complete/incomplete, delete, and **clear completed**.
   - **Chat**: Real-time spaces listing, messages history (with real participant names), and sending text chats.
 - **AI Integration (Gemini)**:
   - Toggleable, context-aware side panel — it sees the selected email, open doc, or task list.
