@@ -17,12 +17,12 @@ from rich.markup import escape as rich_escape
 from gogmail.tui.widgets import (
     GmailTab, CalendarTab, DriveTab, DocsTab, SheetsTab,
     SlidesTab, FormsTab, MeetTab, ZoomTab, ContactsTab,
-    TasksTab, ChatTab, StatusNotification
+    TasksTab, ChatTab, KeepTab, StatusNotification
 )
 from gogmail.tui.screens import (
     ConfirmDialog, GmailLabelScreen, GmailAttachmentScreen, PromptDialog, SettingsScreen,
     TaskCreateScreen, CalendarCreateScreen, CalendarPickerScreen, ContactCreateScreen,
-    GmailComposeScreen, ThemeSelectScreen, THEMES
+    GmailComposeScreen, KeepCreateScreen, ThemeSelectScreen, THEMES
 )
 from gogmail.gog_api import GogAPI, set_error_sink, set_account
 from gogmail.gemini_api import GeminiAPI
@@ -594,6 +594,7 @@ TREE_VIEWS = {
     "contacts": ("contacts-view", "Contacts"),
     "tasks": ("tasks-view", "Tasks"),
     "chat": ("chat-view", "Chat"),
+    "keep": ("keep-view", "Keep"),
 }
 
 # Node type -> the tab's initial-load coroutine method. Tabs load lazily on first
@@ -610,6 +611,7 @@ TREE_LOADERS = {
     "contacts": "refresh_contacts",
     "tasks": "refresh_tasklists",
     "chat": "refresh_spaces",
+    "keep": "refresh_notes",
 }
 
 
@@ -876,6 +878,7 @@ class GogMailApp(App):
                 yield ContactsTab(id="contacts-view")
                 yield TasksTab(id="tasks-view")
                 yield ChatTab(id="chat-view")
+                yield KeepTab(id="keep-view")
 
             yield AISplitter(id="ai-splitter")
             yield AIAssistantPanel(id="ai-drawer")
@@ -947,6 +950,7 @@ class GogMailApp(App):
         tree.root.add_leaf("▪ Contacts", data={"type": "contacts"})
         tree.root.add_leaf("▪ Tasks", data={"type": "tasks"})
         tree.root.add_leaf("▪ Chat", data={"type": "chat"})
+        tree.root.add_leaf("▪ Keep", data={"type": "keep"})
 
         # Populated asynchronously from `gog auth list` in _preflight.
         self._accounts_node = tree.root.add("▪ Accounts", expand=True)
@@ -1469,6 +1473,17 @@ class GogMailApp(App):
             "Creating task list...", "Task list created.",
             lambda: self.query_one(TasksTab).refresh_tasklists(),
         )
+
+    def open_keep_create_dialog(self):
+        async def handle_dismiss(result):
+            if result and (result.get("title") or result.get("text")):
+                await self._run_mutation(
+                    "Creating note...",
+                    GogAPI.keep_create(result.get("title", ""), result.get("text", "")),
+                    "Note created.",
+                    lambda: self.query_one(KeepTab).refresh_notes(),
+                )
+        self.push_screen(KeepCreateScreen(), handle_dismiss)
 
     def open_drive_mkdir_dialog(self):
         self._open_prompt(
