@@ -806,3 +806,19 @@ class GogAPI:
         """Members of a group (each: email, role). Reads return [] on failure."""
         success, res = await run_gog(["groups", "members", group_email])
         return _extract_list(success, res, "members")
+    # --- Backup ---
+    @staticmethod
+    async def backup(destination: str = None, services: str = None) -> tuple[bool, str]:
+        """Export the account into an encrypted backup via `gog backup push`.
+
+        This is a long-running mutation. `destination` is the local backup
+        repository path (passed as `--repo`); `services` is a comma-separated
+        list (e.g. "gmail,calendar,drive") passed as `--services`. `--no-input`
+        keeps it non-interactive. Returns (success, message)."""
+        args = ["backup", "push", "--no-input"]
+        if destination:
+            args += ["--repo", destination]
+        if services:
+            args += ["--services", services]
+        success, res = await run_gog(args)
+        return success, _str_result(res)

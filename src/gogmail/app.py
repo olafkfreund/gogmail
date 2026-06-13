@@ -1603,6 +1603,18 @@ class GogMailApp(App):
             self.notify_status("Settings saved.")
         self.push_screen(SettingsScreen(self.config), handle_dismiss)
 
+    def open_backup_dialog(self):
+        """Prompt for a backup repository path, then run `gog backup push`."""
+        default = os.path.expanduser("~/gogmail-backup")
+        self._open_prompt(
+            "Back up account",
+            "Backup repository path",
+            lambda dest: GogAPI.backup(destination=dest),
+            "Backing up account… (this may take a while)",
+            "Backup complete.",
+            default=default,
+        )
+
     def open_theme_dialog(self):
         async def handle_dismiss(result):
             if result and result in VALID_THEMES:

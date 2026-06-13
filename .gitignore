@@ -17,3 +17,4 @@ result-*
 gogmail.log
 settings.json
 dist/
+.claude/

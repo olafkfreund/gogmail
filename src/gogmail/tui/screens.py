@@ -207,6 +207,13 @@ class SettingsScreen(ModalScreen):
                 "the offline fallback is espeak-ng/spd-say/say.",
                 classes="settings-hint",
             ),
+            Label("Backup", classes="settings-section"),
+            Label(
+                "Export this account into an encrypted backup repository "
+                "(via `gog backup push`).",
+                classes="settings-hint",
+            ),
+            Button("Back up account", variant="primary", id="settings-backup-btn"),
             Horizontal(
                 Button("Save", variant="success", id="settings-save-btn"),
                 Button("Cancel", id="cancel-btn"),
@@ -216,7 +223,11 @@ class SettingsScreen(ModalScreen):
         )
 
     def on_button_pressed(self, event: Button.Pressed):
-        if event.button.id == "settings-save-btn":
+        if event.button.id == "settings-backup-btn":
+            # Close Settings, then let the app drive the backup prompt + run.
+            self.dismiss(None)
+            self.app.open_backup_dialog()
+        elif event.button.id == "settings-save-btn":
             self.dismiss({
                 "voice_input": self.query_one("#set-voice-input", Checkbox).value,
                 "spoken_replies": self.query_one("#set-spoken-replies", Checkbox).value,
