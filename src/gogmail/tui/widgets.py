@@ -2,6 +2,7 @@ from textual.widgets import Static, DataTable, Label, Input, Button, RichLog, Co
 from textual.containers import Vertical, Horizontal, Container
 from textual.message import Message
 from gogmail.gog_api import GogAPI
+from gogmail import images
 from gogmail.llm import get_provider
 from gogmail.zoom_api import ZoomAPI
 import asyncio
@@ -33,6 +34,9 @@ class TUIHTMLParser(HTMLParser):
         self.current_link = None
         self.link_text = []
         self.style_stack = []
+        # Record every <img src> so callers can offer to load remote images
+        # (a tracking-pixel vector — never auto-fetched, see GmailTab).
+        self.image_srcs = []
 
     def handle_starttag(self, tag, attrs):
         if tag in self.hide_tags:
@@ -65,6 +69,9 @@ class TUIHTMLParser(HTMLParser):
             self.current_link = attrs_dict.get('href', '')
             self.link_text = []
         elif tag == 'img':
+            src = (attrs_dict.get('src') or '').strip()
+            if src:
+                self.image_srcs.append(src)
             alt = attrs_dict.get('alt') or ''
             alt = alt.strip()
             if not alt:
@@ -232,6 +239,58 @@ def best_email_text(msg: dict) -> str:
             return plain
     return ""
 
+
+def extract_inline_images(msg: dict) -> list:
+    """Walk a message payload for embedded (CID) image parts.
+
+    Returns a list of {"name", "data": bytes} for every `image/*` part that
+    carries base64 `body.data` (URL-safe). These are part of the message — no
+    network is touched — so they are safe to render automatically.
+    """
+    if not msg or "message" not in msg:
+        return []
+
+    found = []
+
+    def walk(part):
+        mtype = (part.get("mimeType") or "").lower()
+        data = part.get("body", {}).get("data", "")
+        if mtype.startswith("image/") and data:
+            try:
+                raw = base64.urlsafe_b64decode(data.encode("utf-8"))
+            except Exception:
+                raw = b""
+            if raw:
+                name = part.get("filename") or mtype.split("/", 1)[-1] or "image"
+                found.append({"name": name, "data": raw})
+        for p in part.get("parts", []):
+            walk(p)
+
+    walk(msg["message"].get("payload", {}))
+    return found
+
+
+def collect_remote_image_urls(html_body: str) -> list:
+    """Return the distinct https:// `<img src>` URLs in an email's HTML.
+
+    Used by the privacy-gated "Load images" action; remote images are a
+    tracking-pixel vector, so they are never fetched without an explicit opt-in.
+    """
+    if not html_body:
+        return []
+    parser = TUIHTMLParser()
+    try:
+        parser.feed(html_body)
+    except Exception:
+        pass
+    seen, urls = set(), []
+    for src in parser.image_srcs:
+        if src.lower().startswith("https://") and src not in seen:
+            seen.add(src)
+            urls.append(src)
+    return urls
+
+
 def view_media_file(app, file_path: str):
 
     ext = os.path.splitext(file_path)[1].lower()
@@ -358,6 +417,7 @@ class GmailTab(Vertical):
                     Button("Archive", variant="primary", id="gmail-archive-btn"),
                     Button("Trash", variant="error", id="gmail-trash-btn"),
                     Button("Attachments", variant="primary", id="gmail-attachments-btn"),
+                    Button("Load images", variant="primary", id="gmail-images-btn"),
                     Button("AI Summary", variant="primary", id="gmail-summary-btn"),
                     Button("Browser", variant="primary", id="gmail-browser-btn"),
                     Button("Copy Body", variant="primary", id="gmail-copy-btn"),
@@ -496,12 +556,88 @@ class GmailTab(Vertical):
                     # can never leave the body blank.
                     body_view.write(Text(rendered))
 
+            # Inline (CID) images travel inside the message — safe, no network —
+            # so render them automatically below the text.
+            self._render_inline_images(msg)
+
+            # Remote images (<img src="https://…">) are a tracking-pixel vector;
+            # auto-load only if the user has opted in, otherwise wait for the
+            # "Load images" button.
+            if self._remote_images_enabled() and collect_remote_image_urls(extract_html_body(msg)):
+                await self._load_remote_images()
+
             # Auto-mark read in background
             await GogAPI.gmail_mark_read(thread_id)
             self.post_message(StatusNotification("Email loaded."))
         else:
             body_view.write("[red]Failed to load email contents (is your gog token still valid?).[/red]")
             self.post_message(StatusNotification("Failed to load email.", is_error=True))
+
+    # Roughly the pane width to scale images into (half-block cells, 1px wide).
+    IMAGE_MAX_COLS = 60
+    IMAGE_MAX_ROWS = 20
+    IMAGE_LIMIT = 6  # cap how many images we render so the pane isn't flooded
+
+    def _remote_images_enabled(self) -> bool:
+        try:
+            return bool(self.app.config.get("load_remote_images", False))
+        except Exception:
+            return False
+
+    def _image_cols(self) -> int:
+        try:
+            w = self.query_one("#email-body-view").size.width
+        except Exception:
+            w = 0
+        return max(20, min(self.IMAGE_MAX_COLS, w or self.IMAGE_MAX_COLS))
+
+    def _render_inline_images(self, msg: dict):
+        """Render embedded (CID) image parts into the body pane."""
+        body_view = self.query_one("#email-body-view")
+        inline = extract_inline_images(msg)
+        if not inline:
+            return
+        cols = self._image_cols()
+        body_view.write("\n[dim]── Inline images ──[/dim]")
+        for item in inline[: self.IMAGE_LIMIT]:
+            name = item.get("name", "image")
+            body_view.write(f"[dim]{rich_escape(name)}[/dim]")
+            rendered = images.render_image(item.get("data", b""), max_cols=cols, max_rows=self.IMAGE_MAX_ROWS)
+            if rendered is not None:
+                try:
+                    body_view.write(rendered)
+                except Exception:
+                    body_view.write(f"[dim][image: {rich_escape(name)}][/dim]")
+            else:
+                body_view.write(f"[dim][image: {rich_escape(name)}][/dim]")
+
+    async def _load_remote_images(self):
+        """Fetch and render the remote https <img> images for the current message."""
+        if not hasattr(self, "selected_msg") or not self.selected_msg:
+            return
+        urls = collect_remote_image_urls(extract_html_body(self.selected_msg))
+        body_view = self.query_one("#email-body-view")
+        if not urls:
+            body_view.write("\n[dim](No remote images in this email.)[/dim]")
+            return
+        cols = self._image_cols()
+        body_view.write("\n[dim]── Remote images ──[/dim]")
+        self.post_message(StatusNotification(f"Loading {len(urls)} remote image(s)…"))
+        shown = 0
+        for url in urls[: self.IMAGE_LIMIT]:
+            data = await asyncio.to_thread(images.fetch_image_bytes, url)
+            label = clean_url_display(url)
+            body_view.write(f"[dim]{rich_escape(label)}[/dim]")
+            rendered = images.render_image(data, max_cols=cols, max_rows=self.IMAGE_MAX_ROWS) if data else None
+            if rendered is not None:
+                try:
+                    body_view.write(rendered)
+                    shown += 1
+                    continue
+                except Exception:
+                    pass
+            body_view.write(f"[dim][image: {rich_escape(label)}][/dim]")
+        self.post_message(StatusNotification(f"Loaded {shown} remote image(s)."))
 
     async def on_button_pressed(self, event: Button.Pressed):
         if event.button.id == "gmail-compose-btn":
@@ -539,6 +675,8 @@ class GmailTab(Vertical):
             self.app.open_gmail_label_dialog(thread_id)
         elif event.button.id == "gmail-attachments-btn":
             self.app.open_gmail_attachments_dialog(thread_id)
+        elif event.button.id == "gmail-images-btn" and hasattr(self, "selected_msg"):
+            await self._load_remote_images()
         elif event.button.id == "gmail-archive-btn":
             await GogAPI.gmail_archive(thread_id)
             self.post_message(StatusNotification(f"Archived {thread_id}"))

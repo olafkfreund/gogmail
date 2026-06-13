@@ -213,6 +213,12 @@ class SettingsScreen(ModalScreen):
                 value=bool(self._settings.get("show_icons", False)),
                 id="set-show-icons",
             ),
+            Label("Privacy", classes="settings-section"),
+            Checkbox(
+                "Load remote images in emails (off blocks tracking pixels)",
+                value=bool(self._settings.get("load_remote_images", False)),
+                id="set-load-remote-images",
+            ),
             Label("Optional services", classes="settings-section"),
             Label(
                 "These need their own Google API enabled in your Cloud project "
@@ -248,6 +254,7 @@ class SettingsScreen(ModalScreen):
                 "spoken_replies": self.query_one("#set-spoken-replies", Checkbox).value,
                 "tts_engine": "auto" if self.query_one("#set-natural-voice", Checkbox).value else "system",
                 "show_icons": self.query_one("#set-show-icons", Checkbox).value,
+                "load_remote_images": self.query_one("#set-load-remote-images", Checkbox).value,
                 "service_photos": self.query_one("#set-svc-photos", Checkbox).value,
                 "service_youtube": self.query_one("#set-svc-youtube", Checkbox).value,
                 "service_classroom": self.query_one("#set-svc-classroom", Checkbox).value,

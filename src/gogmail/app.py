@@ -46,7 +46,8 @@ def load_config() -> dict:
                 "voice_input": False, "spoken_replies": False,
                 "tts_engine": "auto", "tts_voice": "Kore",
                 "service_photos": False, "service_youtube": False,
-                "service_classroom": False, "show_icons": False}
+                "service_classroom": False, "show_icons": False,
+                "load_remote_images": False}
     path = get_config_path()
     if os.path.exists(path):
         try:
