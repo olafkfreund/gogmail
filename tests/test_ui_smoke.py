@@ -108,6 +108,29 @@ class TestUiSmoke(unittest.IsolatedAsyncioTestCase):
             body = gt.query_one("#email-body-view", RichLog)
             self.assertGreater(len(body.lines), 1, "email body rendered blank after a slow fetch")
 
+    async def test_zoom_create_meeting_button_renders_join_url(self):
+        from gogmail.app import GogMailApp
+        from gogmail.tui.widgets import ZoomTab
+        from gogmail.zoom_api import ZoomAPI
+        from textual.widgets import RichLog
+
+        app = GogMailApp()
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
+            app.query_one("#content-switcher").current = "zoom-view"
+            await pilot.pause()
+            tab = app.query_one(ZoomTab)
+            created = (True, {"join_url": "https://zoom.us/j/42", "start_url": "https://zoom.us/s/42"})
+            with mock.patch.object(ZoomAPI, "create_meeting", _async(created)), \
+                    mock.patch("gogmail.tui.widgets.webbrowser.open") as opened:
+                await tab.on_button_pressed(
+                    type("E", (), {"button": type("B", (), {"id": "zoom-create-btn"})()})())
+                await pilot.pause(0.3)
+                log = tab.query_one("#zoom-output", RichLog)
+                text = "".join(str(s) for s in log.lines)
+                self.assertIn("zoom.us/j/42", text)
+                opened.assert_called_once_with("https://zoom.us/s/42")
+
     async def test_command_palette_opens_with_gogmail_provider(self):
         from textual.command import CommandPalette
         from gogmail.app import GogMailApp, GogMailCommands

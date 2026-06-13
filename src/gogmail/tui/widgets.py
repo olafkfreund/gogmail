@@ -3,6 +3,7 @@ from textual.containers import Vertical, Horizontal, Container
 from textual.message import Message
 from gogmail.gog_api import GogAPI
 from gogmail.gemini_api import GeminiAPI
+from gogmail.zoom_api import ZoomAPI
 import asyncio
 import base64
 import calendar
@@ -1328,8 +1329,12 @@ class ZoomTab(Vertical):
             classes="view-header-row"
         )
         yield Vertical(
-            Label("Validate Zoom Server-to-Server OAuth Credentials status.", classes="description"),
-            Button("Run Zoom Doctor", id="zoom-doctor-btn"),
+            Label("Create an instant Zoom meeting, or validate your Server-to-Server OAuth credentials.", classes="description"),
+            Horizontal(
+                Button("Create Meeting", variant="success", id="zoom-create-btn"),
+                Button("Run Zoom Doctor", id="zoom-doctor-btn"),
+                classes="btn-row"
+            ),
             RichLog(id="zoom-output", highlight=True, markup=True, wrap=True, min_width=0),
             id="zoom-container"
         )
@@ -1344,6 +1349,35 @@ class ZoomTab(Vertical):
             log.clear()
             log.write(rich_escape(res or "(no output)"))
             self.post_message(StatusNotification("Zoom Doctor completed."))
+        elif event.button.id == "zoom-create-btn":
+            self.post_message(StatusNotification("Creating Zoom meeting..."))
+            log = self.query_one("#zoom-output")
+            log.clear()
+            log.write("[dim]Creating Zoom meeting…[/dim]")
+            success, data = await ZoomAPI.create_meeting()
+            log.clear()
+            if not success:
+                log.write(f"[red]Failed to create meeting: {rich_escape(str(data))}[/red]")
+                self.post_message(StatusNotification("Zoom meeting creation failed.", is_error=True))
+                return
+            join_url = data.get("join_url", "")
+            start_url = data.get("start_url", "")
+            self.app.copy_to_clipboard(join_url)
+            log.write("[bold green]Zoom meeting created.[/bold green]\n")
+            if join_url:
+                log.write(f"[bold]Join:[/bold] [link={join_url}]{rich_escape(join_url)}[/link]")
+            passcode = data.get("password")
+            if passcode:
+                log.write(f"[bold]Passcode:[/bold] {rich_escape(str(passcode))}")
+            log.write("\n[dim]Join link copied to clipboard. Opening your Zoom client…[/dim]")
+            # start_url launches the host's desktop Zoom client (or web) to begin
+            # the meeting; join_url is the one to share with participants.
+            try:
+                if start_url:
+                    webbrowser.open(start_url)
+            except Exception as e:
+                self.post_message(StatusNotification(f"Could not open Zoom client: {e}", is_error=True))
+            self.post_message(StatusNotification("Zoom meeting created — opening client."))
 
 
 # --- CONTACTS & PEOPLE TAB ---

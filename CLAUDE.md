@@ -4,10 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-GogMail is a [Textual](https://textual.textualize.io/) TUI client for Google Workspace (Gmail, Calendar, Drive, Docs/Sheets/Slides/Forms, Meet, Zoom, Contacts, Tasks, Chat) plus an embedded Gemini AI assistant. It is a **thin TUI over two external dependencies** — it does not talk to Google APIs directly:
+GogMail is a [Textual](https://textual.textualize.io/) TUI client for Google Workspace (Gmail, Calendar, Drive, Docs/Sheets/Slides/Forms, Meet, Zoom, Contacts, Tasks, Chat) plus an embedded Gemini AI assistant. It is a **thin TUI over external services** — it does not talk to Google APIs directly:
 
 - **All Workspace data flows through the `gog` CLI** (a separately installed tool), invoked as `gog --json <subcommand>`. The TUI never holds Google credentials; `gog` owns auth.
 - **AI flows through the Gemini REST API** over plain `requests`, keyed by `GEMINI_API_KEY`.
+- **Zoom meeting creation goes to the Zoom REST API** (`zoom_api.py`, `requests` in a thread, mirroring `gemini_api.py`) since gogcli only manages Zoom auth and has no meeting commands. Credentials come from `GOG_ZOOM_ACCOUNT_ID`/`GOG_ZOOM_CLIENT_ID`/`GOG_ZOOM_CLIENT_SECRET` (the same names gogcli accepts); the S2S app needs a `meeting:write` scope.
 
 ## Commands
 
