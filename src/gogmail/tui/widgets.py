@@ -1504,7 +1504,9 @@ class TasksTab(Vertical):
             Horizontal(
                 Button("New Task List", id="tasklist-add-btn"),
                 Button("New Task", variant="success", id="task-add-btn"),
+                Button("Edit Task", id="task-edit-btn"),
                 Button("Delete Task", variant="error", id="task-del-btn"),
+                Button("Clear Completed", variant="warning", id="task-clear-btn"),
                 classes="header-buttons"
             ),
             classes="view-header-row"
@@ -1522,7 +1524,7 @@ class TasksTab(Vertical):
         
         t_table = self.query_one("#tasks-table")
         t_table.cursor_type = "row"
-        t_table.add_columns("Completed", "Task Title", "Notes")
+        t_table.add_columns("Completed", "Task Title", "Due", "Notes")
         
         self.selected_list_id = None
 
@@ -1556,7 +1558,9 @@ class TasksTab(Vertical):
         
         for t in tasks:
             status = "[x] Yes" if t.get("status") == "completed" else "[ ] No"
-            t_table.add_row(status, t.get("title", ""), t.get("notes", ""), key=t.get("id"))
+            # Google Tasks returns `due` as an RFC3339 timestamp; show just the date.
+            due = (t.get("due") or "")[:10]
+            t_table.add_row(status, t.get("title", ""), due, t.get("notes", ""), key=t.get("id"))
             
         self.post_message(StatusNotification(f"Loaded {len(tasks)} tasks."))
 
@@ -1581,17 +1585,34 @@ class TasksTab(Vertical):
                     self.post_message(StatusNotification("Task marked as completed."))
                 await self.refresh_tasks()
 
+    def _selected_task(self) -> dict | None:
+        """Return the task dict under the tasks-table cursor, or None."""
+        t_table = self.query_one("#tasks-table")
+        if t_table.cursor_row is None:
+            return None
+        task_id = t_table.ordered_rows[t_table.cursor_row].key.value
+        return next((t for t in getattr(self, "tasks_data", []) if t.get("id") == task_id), None)
+
     async def on_button_pressed(self, event: Button.Pressed):
         if event.button.id == "tasklist-add-btn":
             self.app.open_tasklist_create_dialog()
         elif event.button.id == "task-add-btn" and self.selected_list_id:
             self.app.open_task_create_dialog(self.selected_list_id)
+        elif event.button.id == "task-edit-btn" and self.selected_list_id:
+            task = self._selected_task()
+            if task:
+                self.app.open_task_edit_dialog(self.selected_list_id, task)
+        elif event.button.id == "task-clear-btn" and self.selected_list_id:
+            async def do_clear():
+                await GogAPI.tasks_clear_completed(self.selected_list_id)
+                self.post_message(StatusNotification("Completed tasks cleared."))
+                await self.refresh_tasks()
+            self.app.confirm("Clear all completed tasks from this list?", do_clear, "Clear")
         elif event.button.id == "task-del-btn" and self.selected_list_id:
-            t_table = self.query_one("#tasks-table")
-            if t_table.cursor_row is not None:
-                task_id = t_table.ordered_rows[t_table.cursor_row].key.value
-                title = next(
-                    (t.get("title", "") for t in getattr(self, "tasks_data", []) if t.get("id") == task_id), "")
+            task = self._selected_task()
+            if task:
+                task_id = task.get("id")
+                title = task.get("title", "")
 
                 async def do_delete():
                     await GogAPI.tasks_delete(self.selected_list_id, task_id)

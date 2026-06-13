@@ -1187,11 +1187,32 @@ class GogMailApp(App):
             if result:
                 await self._run_mutation(
                     "Creating task...",
-                    GogAPI.tasks_add(tasklist_id=tasklist_id, title=result.get("title"), notes=result.get("notes")),
+                    GogAPI.tasks_add(tasklist_id=tasklist_id, title=result.get("title"),
+                                     notes=result.get("notes"), due=result.get("due") or ""),
                     "Task created.",
                     lambda: self.query_one(TasksTab).refresh_tasks(),
                 )
         self.push_screen(TaskCreateScreen(tasklist_id), handle_dismiss)
+
+    def open_task_edit_dialog(self, tasklist_id: str, task: dict):
+        prefill = {
+            "title": task.get("title", ""),
+            "notes": task.get("notes", ""),
+            # Google Tasks stores due as an RFC3339 timestamp; show just the date.
+            "due": (task.get("due") or "")[:10],
+        }
+        task_id = task.get("id")
+
+        async def handle_dismiss(result):
+            if result:
+                await self._run_mutation(
+                    "Updating task...",
+                    GogAPI.tasks_edit(tasklist_id, task_id, title=result.get("title"),
+                                      notes=result.get("notes"), due=result.get("due") or ""),
+                    "Task updated.",
+                    lambda: self.query_one(TasksTab).refresh_tasks(),
+                )
+        self.push_screen(TaskCreateScreen(tasklist_id, prefill=prefill), handle_dismiss)
 
     def open_tasklist_create_dialog(self):
         self._open_prompt(
