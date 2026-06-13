@@ -1,5 +1,6 @@
 """Headless UI smoke tests: mount the real app with mocked gog data and verify
 core flows don't crash and render content."""
+import asyncio
 import unittest
 from unittest import mock
 
@@ -81,6 +82,31 @@ class TestUiSmoke(unittest.IsolatedAsyncioTestCase):
             app.open_compose_dialog(to="x@y.example")
             await pilot.pause()
             self.assertIsInstance(app.screen, GmailComposeScreen)
+
+    async def test_slow_email_fetch_still_renders_body(self):
+        # Regression: a non-instant fetch makes any RichLog.loading overlay
+        # actually engage, and toggling it off wipes the log — which silently
+        # blanked slow-loading emails/docs/zoom output. A delayed mock plus
+        # real pilot pauses reproduces that timing; the body must still render.
+        from gogmail.app import GogMailApp
+        from textual.widgets import RichLog
+
+        async def slow_get(*a, **k):
+            await asyncio.sleep(0.2)
+            return {"headers": {"from": "a@x.example", "subject": "Hi", "date": "2026-06-10"},
+                    "body": "Hello there, this is the body.", "message": {"payload": {}}}
+
+        app = GogMailApp()
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
+            gt = app.query_one(GmailTab)
+            await gt.set_query("label:INBOX")
+            await pilot.pause()
+            with mock.patch.object(GogAPI, "gmail_get_message", slow_get):
+                await gt.on_data_table_row_selected(FakeRowSelected("t1"))
+                await pilot.pause(0.5)
+            body = gt.query_one("#email-body-view", RichLog)
+            self.assertGreater(len(body.lines), 1, "email body rendered blank after a slow fetch")
 
     async def test_command_palette_opens_with_gogmail_provider(self):
         from textual.command import CommandPalette

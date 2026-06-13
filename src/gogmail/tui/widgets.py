@@ -429,14 +429,15 @@ class GmailTab(Vertical):
         body_view = self.query_one("#email-body-view")
         body_view.clear()
 
-        # Switch to the detail view immediately and show an animated spinner while
-        # the (potentially slow) fetch runs, so the pane is never blank.
+        # Switch to the detail view immediately and show a placeholder while the
+        # (potentially slow) fetch runs, so the pane is never blank. NB: do NOT
+        # use RichLog.loading here — toggling that reactive wipes the log's
+        # written content once the overlay has actually rendered (a real,
+        # non-instant await), which silently blanked slow-loading emails.
         self.query_one("#gmail-switcher").current = "gmail-detail-view"
-        body_view.loading = True
-        try:
-            msg = await GogAPI.gmail_get_message(thread_id)
-        finally:
-            body_view.loading = False
+        body_view.write("[dim]Loading email…[/dim]")
+        msg = await GogAPI.gmail_get_message(thread_id)
+        body_view.clear()
         self.selected_msg = msg
 
         if msg:
@@ -535,17 +536,15 @@ class GmailTab(Vertical):
             headers = msg.get("headers", {})
             self.post_message(StatusNotification("Generating summary with Gemini..."))
             body_view = self.query_one("#email-body-view")
-            body_view.loading = True
-            try:
-                summary = await GeminiAPI.summarize_email(
-                    subject=headers.get("subject", ""),
-                    sender=headers.get("from", ""),
-                    # best_email_text handles HTML-only messages; the raw body
-                    # field would feed Gemini a wall of tags.
-                    body=best_email_text(msg)
-                )
-            finally:
-                body_view.loading = False
+            body_view.clear()
+            body_view.write("[dim]Generating summary with Gemini…[/dim]")
+            summary = await GeminiAPI.summarize_email(
+                subject=headers.get("subject", ""),
+                sender=headers.get("from", ""),
+                # best_email_text handles HTML-only messages; the raw body
+                # field would feed Gemini a wall of tags.
+                body=best_email_text(msg)
+            )
             # Display summary in the text pane
             body_view.clear()
             body_view.write("[bold green]=== GEMINI SUMMARY ===[/bold green]\n")
@@ -1198,11 +1197,9 @@ class DocsTab(DriveMimeTab):
 
         viewer = self.query_one("#doc-viewer")
         viewer.clear()
-        viewer.loading = True
-        try:
-            text = await GogAPI.docs_cat(doc_id)
-        finally:
-            viewer.loading = False
+        viewer.write("[dim]Reading document…[/dim]")
+        text = await GogAPI.docs_cat(doc_id)
+        viewer.clear()
         if text.strip():
             # Text(): document content must render literally — markdown links
             # like [name](url) are Rich markup and raised MarkupError, leaving
@@ -1342,11 +1339,9 @@ class ZoomTab(Vertical):
             self.post_message(StatusNotification("Validating Zoom configuration..."))
             log = self.query_one("#zoom-output")
             log.clear()
-            log.loading = True
-            try:
-                res = await GogAPI.zoom_doctor()
-            finally:
-                log.loading = False
+            log.write("[dim]Validating Zoom configuration…[/dim]")
+            res = await GogAPI.zoom_doctor()
+            log.clear()
             log.write(rich_escape(res or "(no output)"))
             self.post_message(StatusNotification("Zoom Doctor completed."))
 
