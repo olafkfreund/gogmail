@@ -587,6 +587,8 @@ class CalendarTab(Vertical):
                 Button("Month", id="cal-view-month", classes="cal-view-toggle"),
                 Button("Week", id="cal-view-week", classes="cal-view-toggle"),
                 Button("Day", id="cal-view-day", classes="cal-view-toggle"),
+                Button("Calendars", id="cal-pick-btn"),
+                Button("Free/Busy", id="cal-freebusy-btn"),
                 Button("Add Event", variant="success", id="cal-add-btn"),
                 Button("Edit Event", variant="primary", id="cal-edit-btn"),
                 Button("Delete Event", variant="error", id="cal-del-btn"),
@@ -609,6 +611,10 @@ class CalendarTab(Vertical):
         self.tasks_data = []
         self.cell_map = {}
         self.selected_event = None
+        # Calendars chosen via the picker. Empty = primary only (default).
+        self.selected_calendar_ids = []
+        # Map calendar id -> display summary, populated when the picker loads.
+        self.calendar_names = {}
         
         table = self.query_one("#calendar-table")
         table.cursor_type = "cell"
@@ -616,9 +622,20 @@ class CalendarTab(Vertical):
     async def refresh_calendar(self):
         self.post_message(StatusNotification("Fetching calendar events & tasks..."))
         
-        # 1. Fetch calendar events
-        self.events_data = await GogAPI.calendar_events()
-        
+        # 1. Fetch calendar events. With no picker selection this is the original
+        #    "primary" call; otherwise fetch each selected calendar concurrently
+        #    and merge, tagging every event with the calendar it came from so the
+        #    detail panel can show which calendar an event belongs to.
+        cal_ids = self.selected_calendar_ids or ["primary"]
+        per_cal = await asyncio.gather(
+            *(GogAPI.calendar_events(cal_id) for cal_id in cal_ids)
+        )
+        self.events_data = []
+        for cal_id, events in zip(cal_ids, per_cal):
+            for e in events:
+                e["_calendar"] = cal_id
+            self.events_data.extend(events)
+
         # 2. Fetch all tasks (one gog call per list, run concurrently)
         self.tasks_data = []
         try:
@@ -879,6 +896,12 @@ class CalendarTab(Vertical):
             # Escape all user/API-supplied event fields so a "[...]" in a title
             # or description renders literally instead of breaking the markup.
             detail_view.write(f"• [bold green]{time_str}[/bold green] {rich_escape(e.get('summary', '(No Title)'))}")
+            # Only show the source calendar when more than one is on screen.
+            if self.selected_calendar_ids and len(self.selected_calendar_ids) > 1:
+                cal_id = e.get("_calendar", "")
+                cal_label = self.calendar_names.get(cal_id, cal_id)
+                if cal_label:
+                    detail_view.write(f"  [magenta]Calendar:[/magenta] {rich_escape(cal_label)}")
             detail_view.write(f"  [magenta]ID:[/magenta] {rich_escape(e.get('id', ''))}")
             if e.get("organizer", {}).get("email"):
                 detail_view.write(f"  [magenta]Organizer:[/magenta] {rich_escape(e.get('organizer', {}).get('email'))}")
@@ -897,6 +920,27 @@ class CalendarTab(Vertical):
             if t.get("notes"):
                 detail_view.write(f"  [dim]Notes: {rich_escape(t.get('notes'))}[/dim]")
             detail_view.write("")
+
+    def show_freebusy(self, who: str, day_str: str, busy: list):
+        """Render free/busy intervals for `who` on `day_str` into the detail panel.
+
+        `busy` is the list of {"start","end"} blocks from GogAPI.calendar_freebusy.
+        """
+        detail_view = self.query_one("#calendar-detail")
+        detail_view.clear()
+        detail_view.write(f"[bold yellow]Free/Busy for {rich_escape(who)}[/bold yellow]")
+        detail_view.write(f"[bold cyan]{rich_escape(day_str)}[/bold cyan]\n")
+        if not busy:
+            detail_view.write("[bold green]Free all day — no busy intervals.[/bold green]")
+            return
+        detail_view.write("[bold red]--- Busy ({}) ---[/bold red]".format(len(busy)))
+        for block in busy:
+            start = block.get("start", "")
+            end = block.get("end", "")
+            # Show HH:MM when the interval is within a day; otherwise the raw value.
+            s = start[11:16] if "T" in start else start
+            en = end[11:16] if "T" in end else end
+            detail_view.write(f"• [bold red]{rich_escape(s)} – {rich_escape(en)}[/bold red]")
 
     async def on_data_table_cell_selected(self, event: DataTable.CellSelected):
         self.update_detail_panel()
@@ -957,7 +1001,15 @@ class CalendarTab(Vertical):
         elif event.button.id == "cal-add-btn":
             self.app.open_calendar_create_dialog()
             return
-            
+
+        elif event.button.id == "cal-pick-btn":
+            self.app.open_calendar_picker_dialog(self)
+            return
+
+        elif event.button.id == "cal-freebusy-btn":
+            self.app.open_freebusy_dialog(self)
+            return
+
         if not self.selected_event:
             self.post_message(StatusNotification("No calendar event selected to action. Select a slot/event first."))
             return
