@@ -288,6 +288,23 @@ class GogAPI:
         success, _ = await run_gog(["gmail", "unread", message_id])
         return success
 
+    @staticmethod
+    async def gmail_list_attachments(thread_id: str) -> list:
+        """List attachments across all messages in a thread.
+
+        Each entry is a dict: filename, mimeType, size, sizeHuman,
+        attachmentId, messageId. Returns [] on failure (surfaced via the sink).
+        """
+        success, res = await run_gog(["gmail", "thread", "attachments", thread_id])
+        return _extract_list(success, res, "attachments")
+
+    @staticmethod
+    async def gmail_download_attachment(message_id: str, attachment_id: str, destination: str) -> tuple[bool, str]:
+        """Download a single attachment to a file path (mirrors drive_download)."""
+        success, res = await run_gog(
+            ["gmail", "attachment", message_id, attachment_id, "--out", destination])
+        return success, _str_result(res)
+
     # --- Calendar ---
     @staticmethod
     async def calendar_list() -> list:

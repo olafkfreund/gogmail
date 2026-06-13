@@ -20,8 +20,8 @@ from gogmail.tui.widgets import (
     TasksTab, ChatTab, StatusNotification
 )
 from gogmail.tui.screens import (
-    ConfirmDialog, GmailLabelScreen, PromptDialog, SettingsScreen, TaskCreateScreen,
-    CalendarCreateScreen, GmailComposeScreen, ThemeSelectScreen, THEMES
+    ConfirmDialog, GmailLabelScreen, GmailAttachmentScreen, PromptDialog, SettingsScreen,
+    TaskCreateScreen, CalendarCreateScreen, GmailComposeScreen, ThemeSelectScreen, THEMES
 )
 from gogmail.gog_api import GogAPI, set_error_sink, set_account
 from gogmail.gemini_api import GeminiAPI
@@ -1142,6 +1142,33 @@ class GogMailApp(App):
             except Exception:
                 pass
         await gmail.refresh_emails()
+
+    def open_gmail_attachments_dialog(self, thread_id: str):
+        """List a thread's attachments in a picker, then download the chosen one."""
+        async def load_and_show():
+            self.notify_status("Listing attachments…")
+            attachments = await GogAPI.gmail_list_attachments(thread_id)
+            if not attachments:
+                self.notify_status("This email has no attachments.")
+                return
+
+            def handle(result):
+                if not result:
+                    return
+                att = result["attachment"]
+                dest_dir = os.path.expanduser(result["dest_dir"])
+                filename = att.get("filename") or att.get("attachmentId") or "attachment"
+                dest = os.path.join(dest_dir, filename)
+                self.run_worker(self._run_mutation(
+                    f"Downloading {filename}…",
+                    GogAPI.gmail_download_attachment(
+                        att.get("messageId"), att.get("attachmentId"), dest),
+                    f"Saved {filename} to {dest}.",
+                ))
+
+            self.push_screen(GmailAttachmentScreen(attachments), handle)
+
+        self.run_worker(load_and_show())
 
     def open_calendar_create_dialog(self):
         async def handle_dismiss(result):

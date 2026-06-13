@@ -110,6 +110,71 @@ class GmailLabelScreen(ModalScreen):
             self.dismiss(None)
 
 
+class GmailAttachmentScreen(ModalScreen):
+    """Pick one attachment from an email and a destination directory to save it.
+
+    Dismisses with {"attachment": <dict>, "dest_dir": <path>} or None.
+    Each attachment dict carries filename/mimeType/sizeHuman/attachmentId/messageId.
+    """
+    def __init__(self, attachments: list):
+        super().__init__()
+        self._attachments = attachments or []
+        # Pre-format human labels: "filename (size, mimeType)".
+        self._labels = [
+            "{}  ({})".format(
+                a.get("filename") or "(unnamed)",
+                a.get("sizeHuman") or _human_size(a.get("size")),
+            )
+            for a in self._attachments
+        ]
+
+    def compose(self):
+        yield Vertical(
+            Label("Download attachment", classes="dialog-title"),
+            Label("Choose an attachment:"),
+            OptionList(*self._labels, id="attachment-list"),
+            Label("Save to directory:"),
+            Input(value=os.path.expanduser("~/Downloads"), id="attachment-dest"),
+            Horizontal(
+                Button("Download", variant="success", id="attachment-dl-btn"),
+                Button("Cancel", id="cancel-btn"),
+                classes="btn-row",
+            ),
+            id="dialog-container",
+        )
+
+    def on_mount(self):
+        self.query_one("#attachment-list", OptionList).focus()
+
+    def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "attachment-dl-btn":
+            ol = self.query_one("#attachment-list", OptionList)
+            idx = ol.highlighted
+            if idx is None or idx < 0 or idx >= len(self._attachments):
+                self.app.notify("Select an attachment to download.", severity="warning")
+                return
+            dest_dir = self.query_one("#attachment-dest", Input).value.strip()
+            if not dest_dir:
+                self.app.notify("Enter a destination directory.", severity="warning")
+                return
+            self.dismiss({"attachment": self._attachments[idx], "dest_dir": dest_dir})
+        else:
+            self.dismiss(None)
+
+
+def _human_size(size) -> str:
+    """Fallback humaniser for byte counts when gog gives no sizeHuman."""
+    try:
+        n = float(size)
+    except (TypeError, ValueError):
+        return "?"
+    for unit in ("B", "KB", "MB", "GB"):
+        if n < 1024 or unit == "GB":
+            return f"{n:.0f} {unit}" if unit == "B" else f"{n:.1f} {unit}"
+        n /= 1024
+    return f"{n:.1f} GB"
+
+
 class SettingsScreen(ModalScreen):
     """Preferences page. Dismisses with the updated settings dict, or None."""
     def __init__(self, settings: dict):
