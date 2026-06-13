@@ -138,9 +138,20 @@
 }
 
 /* Drive View */
-#drive-table {
+#drive-content-row {
+    layout: horizontal;
     height: 1fr;
-    width: 100%;
+}
+
+#drive-table {
+    width: 60fr;
+    height: 100%;
+}
+
+#drive-preview {
+    width: 40fr;
+    height: 100%;
+    padding: 1;
 }
 
 /* Docs View */
@@ -541,6 +552,7 @@ GmailComposeScreen, CalendarCreateScreen {
 }
 .theme-gruvbox #calendar-detail,
 .theme-gruvbox #doc-viewer,
+.theme-gruvbox #drive-preview,
 .theme-gruvbox #sheet-grid,
 .theme-gruvbox #chat-message-pane,
 .theme-gruvbox #contact-detail,
@@ -657,6 +669,7 @@ GmailComposeScreen, CalendarCreateScreen {
 }
 .theme-catppuccin #calendar-detail,
 .theme-catppuccin #doc-viewer,
+.theme-catppuccin #drive-preview,
 .theme-catppuccin #sheet-grid,
 .theme-catppuccin #chat-message-pane,
 .theme-catppuccin #contact-detail,
@@ -773,6 +786,7 @@ GmailComposeScreen, CalendarCreateScreen {
 }
 .theme-nord #calendar-detail,
 .theme-nord #doc-viewer,
+.theme-nord #drive-preview,
 .theme-nord #sheet-grid,
 .theme-nord #chat-message-pane,
 .theme-nord #contact-detail,
@@ -889,6 +903,7 @@ GmailComposeScreen, CalendarCreateScreen {
 }
 .theme-dracula #calendar-detail,
 .theme-dracula #doc-viewer,
+.theme-dracula #drive-preview,
 .theme-dracula #sheet-grid,
 .theme-dracula #chat-message-pane,
 .theme-dracula #contact-detail,
@@ -1005,6 +1020,7 @@ GmailComposeScreen, CalendarCreateScreen {
 }
 .theme-monokai #calendar-detail,
 .theme-monokai #doc-viewer,
+.theme-monokai #drive-preview,
 .theme-monokai #sheet-grid,
 .theme-monokai #chat-message-pane,
 .theme-monokai #contact-detail,
@@ -1121,6 +1137,7 @@ GmailComposeScreen, CalendarCreateScreen {
 }
 .theme-solarized #calendar-detail,
 .theme-solarized #doc-viewer,
+.theme-solarized #drive-preview,
 .theme-solarized #sheet-grid,
 .theme-solarized #chat-message-pane,
 .theme-solarized #contact-detail,
