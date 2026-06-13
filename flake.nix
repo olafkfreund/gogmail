@@ -46,7 +46,7 @@
 
           gogmail = python.pkgs.buildPythonApplication {
             pname = "gogmail";
-            version = "0.1.0";
+            version = "1.0.0";
             src = ./.;
             pyproject = true;
 
