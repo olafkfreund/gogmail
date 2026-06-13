@@ -225,6 +225,21 @@ class TestUiSmoke(unittest.IsolatedAsyncioTestCase):
                 await app._apply_label("t1", {"label": "Receipts", "move": False, "create": True})
             self.assertEqual(created, ["Receipts"])
 
+    async def test_read_tool_navigates_to_its_client_view(self):
+        # A read tool should open the matching client view (so results show in
+        # the tab, not just the chat) in addition to returning data.
+        from gogmail.app import GogMailApp, _tool_list_tasks
+        app = GogMailApp()
+        async with app.run_test(size=(140, 45)) as pilot:
+            await pilot.pause()
+            with mock.patch.object(GogAPI, "tasks_list",
+                                   _async([{"id": "k1", "title": "Ship it", "status": "needsAction"}])), \
+                    mock.patch.object(GogAPI, "tasks_lists", _async([{"id": "L1", "title": "My Tasks"}])):
+                result = await _tool_list_tasks(app, {})
+                await pilot.pause()
+            self.assertEqual(app.query_one("#content-switcher").current, "tasks-view")
+            self.assertIn("Ship it", result)
+
     async def test_command_palette_opens_with_gogmail_provider(self):
         from textual.command import CommandPalette
         from gogmail.app import GogMailApp, GogMailCommands

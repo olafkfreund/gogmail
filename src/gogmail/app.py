@@ -135,6 +135,7 @@ async def _tool_search_emails(app, params) -> str:
 
 
 async def _tool_list_events(app, params) -> str:
+    app.assistant_show("calendar-view", "refresh_calendar")
     rng = (params.get("range") or "week").lower()
     events = await GogAPI.calendar_events(
         "primary", time_range=rng, time_from=params.get("from"),
@@ -150,6 +151,7 @@ async def _tool_list_events(app, params) -> str:
 
 
 async def _tool_list_tasks(app, params) -> str:
+    app.assistant_show("tasks-view", "refresh_tasklists")
     tasks = await GogAPI.tasks_list("@default")
     if not tasks:
         return "No open tasks in your default list."
@@ -165,6 +167,7 @@ async def _tool_search_drive(app, params) -> str:
     query = params.get("query")
     if not query:
         return "Error: provide a search query (a keyword in the file name or content)."
+    app.assistant_show("drive-view", "refresh_files", query)
     files = await GogAPI.drive_search(query)
     if not files:
         return f"No Drive files matched '{query}'."
@@ -185,6 +188,7 @@ async def _tool_read_doc(app, params) -> str:
 
 async def _tool_search_contacts(app, params) -> str:
     query = params.get("query")
+    app.assistant_show("contacts-view", "refresh_contacts", query)
     contacts = await (GogAPI.contacts_search(query) if query else GogAPI.contacts_list())
     if not contacts:
         return "No contacts found." if query else "Your contact list is empty."
@@ -365,6 +369,11 @@ def _build_system_instruction(tools) -> str:
         "search_contacts) to fetch the data, THEN summarize the result for the user. Never claim "
         "you can't see something before trying its read tool. The context gives you the current "
         "time, so resolve relative dates like 'this week' yourself.",
+        "",
+        "These read tools ALSO open the matching client view (Tasks, Calendar, Drive, Contacts, "
+        "Gmail) populated with the results. So after one runs, do NOT re-list every item in chat — "
+        "reply with a short confirmation or a one-line highlight (e.g. 'Showing your 5 tasks — 2 are "
+        "due this week') and point the user to the view.",
         "",
         "To call a tool, output a SINGLE JSON code block wrapped in ```json and ``` and nothing "
         "else. When you have the data and are answering the user, reply in plain markdown with no "
@@ -600,7 +609,11 @@ class AIAssistantPanel(Vertical):
                 # Escape tool_name too: it comes from the model and could carry markup.
                 log.write(f"[italic green]Executing {rich_escape(str(tool_name))}...[/italic green]")
                 result_msg = await execute_tool(self.app, tool_name, params)
-                log.write(f"[bold green]Gemini (Tool Executed):[/bold green] {rich_escape(result_msg)}")
+                # Show only a one-line confirmation in the chat — the full result
+                # goes to the model (below) and the data itself is shown in the
+                # relevant client view, so we don't dump it into the panel.
+                summary_line = (result_msg.splitlines() or [""])[0][:80]
+                log.write(f"[dim green]✓ {rich_escape(str(tool_name))}: {rich_escape(summary_line)}[/dim green]")
                 # Cap what re-enters the history (display is already capped) and keep
                 # a sliding window so long sessions can't outgrow the context window.
                 self.chat_history.append(
@@ -889,6 +902,23 @@ class GogMailApp(App):
     async def safe_refresh(self, tab_cls, method: str) -> None:
         try:
             await getattr(self.query_one(tab_cls), method)()
+        except Exception:
+            pass
+
+    def assistant_show(self, view_id: str, loader: str = None, *loader_args) -> None:
+        """Used by read-tools: switch the client to the relevant tab and refresh
+        it, so the assistant's results also appear in the proper window (not just
+        the chat panel). Best-effort; never raises into the tool handler."""
+        try:
+            switcher = self.query_one("#content-switcher")
+            switcher.current = view_id
+            label = next((lbl for vid, lbl in TREE_VIEWS.values() if vid == view_id), None)
+            if label:
+                self.title = f"Google Workspace - {label}"
+            if loader:
+                tab = self.query_one(f"#{view_id}")
+                tab._loaded = True
+                self.run_worker(getattr(tab, loader)(*loader_args))
         except Exception:
             pass
 
