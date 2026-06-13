@@ -17,7 +17,7 @@ from rich.markup import escape as rich_escape
 from gogmail.tui.widgets import (
     GmailTab, CalendarTab, DriveTab, DocsTab, SheetsTab,
     SlidesTab, FormsTab, MeetTab, ZoomTab, ContactsTab,
-    TasksTab, ChatTab, StatusNotification
+    TasksTab, ChatTab, GroupsTab, StatusNotification
 )
 from gogmail.tui.screens import (
     ConfirmDialog, GmailLabelScreen, GmailAttachmentScreen, PromptDialog, SettingsScreen,
@@ -594,6 +594,7 @@ TREE_VIEWS = {
     "contacts": ("contacts-view", "Contacts"),
     "tasks": ("tasks-view", "Tasks"),
     "chat": ("chat-view", "Chat"),
+    "groups": ("groups-view", "Groups"),
 }
 
 # Node type -> the tab's initial-load coroutine method. Tabs load lazily on first
@@ -610,6 +611,7 @@ TREE_LOADERS = {
     "contacts": "refresh_contacts",
     "tasks": "refresh_tasklists",
     "chat": "refresh_spaces",
+    "groups": "refresh_groups",
 }
 
 
@@ -876,6 +878,7 @@ class GogMailApp(App):
                 yield ContactsTab(id="contacts-view")
                 yield TasksTab(id="tasks-view")
                 yield ChatTab(id="chat-view")
+                yield GroupsTab(id="groups-view")
 
             yield AISplitter(id="ai-splitter")
             yield AIAssistantPanel(id="ai-drawer")
@@ -947,6 +950,7 @@ class GogMailApp(App):
         tree.root.add_leaf("▪ Contacts", data={"type": "contacts"})
         tree.root.add_leaf("▪ Tasks", data={"type": "tasks"})
         tree.root.add_leaf("▪ Chat", data={"type": "chat"})
+        tree.root.add_leaf("▪ Groups", data={"type": "groups"})
 
         # Populated asynchronously from `gog auth list` in _preflight.
         self._accounts_node = tree.root.add("▪ Accounts", expand=True)
