@@ -180,8 +180,7 @@ async def _tool_read_doc(app, params) -> str:
     text = await GogAPI.docs_cat(doc_id)
     if not text.strip():
         return "The document is empty or could not be read."
-    return (_truncate("Document text:\n" + text, 6000)
-            + "\n\nNow answer the user's request about this document.")
+    return _truncate("Document text:\n" + text, 6000)
 
 
 async def _tool_search_contacts(app, params) -> str:
@@ -397,10 +396,12 @@ def _extract_tool_call(response_text: str):
     m = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', response_text, re.DOTALL)
     if m:
         candidates.append(m.group(1))
-    brace = re.search(r'\{.*\}', response_text, re.DOTALL)
-    if brace:
-        candidates.append(brace.group(0))
-    candidates.append(response_text.strip())
+    # Only treat a bare object as a call when the WHOLE reply is that object —
+    # never scan mid-prose, so an email subject like {"tool":"send_email"} can't
+    # be echoed into an unintended (and possibly destructive) tool dispatch.
+    stripped = response_text.strip()
+    if stripped.startswith("{") and stripped.endswith("}"):
+        candidates.append(stripped)
     for cand in candidates:
         try:
             parsed = json.loads(cand)
@@ -593,15 +594,23 @@ class AIAssistantPanel(Vertical):
 
                 tool_name = tool_data.get("tool") or tool_data.get("tool_name") or tool_data.get("tool_code")
                 params = tool_data.get("parameters") or tool_data
-                log.write(f"[italic green]Executing {tool_name}...[/italic green]")
+                if not tool_name:
+                    log.write(f"[bold green]Gemini:[/bold green] {rich_escape(response_text)}")
+                    return
+                # Escape tool_name too: it comes from the model and could carry markup.
+                log.write(f"[italic green]Executing {rich_escape(str(tool_name))}...[/italic green]")
                 result_msg = await execute_tool(self.app, tool_name, params)
                 log.write(f"[bold green]Gemini (Tool Executed):[/bold green] {rich_escape(result_msg)}")
+                # Cap what re-enters the history (display is already capped) and keep
+                # a sliding window so long sessions can't outgrow the context window.
                 self.chat_history.append(
-                    {"role": "user", "parts": [{"text": f"Tool '{tool_name}' execution result: {result_msg}"}]}
+                    {"role": "user", "parts": [{"text": f"Tool '{tool_name}' result: {result_msg[:3000]}"}]}
                 )
+                if len(self.chat_history) > 24:
+                    self.chat_history = self.chat_history[-24:]
                 log.write("[italic green]Gemini is thinking...[/italic green]")
 
-            log.write("[bold red]Gemini: Execution limit reached (max 5 tool calls).[/bold red]")
+            log.write(f"[bold red]Gemini: Execution limit reached (max {max_steps} tool calls).[/bold red]")
 
         async def run_ai_safely():
             # An unhandled exception in a bare create_task is silently dropped,
