@@ -275,6 +275,89 @@ async def _tool_add_task(app, params) -> str:
     return "Failed to add task."
 
 
+# --- Write/action tools ----------------------------------------------------
+def _selected_thread_id(app, params):
+    """Resolve a thread id from params, else the currently selected Gmail thread."""
+    thread_id = params.get("thread_id")
+    if thread_id:
+        return thread_id
+    try:
+        return getattr(app.query_one(GmailTab), "selected_thread_id", None)
+    except Exception:
+        return None
+
+
+async def _tool_save_draft(app, params) -> str:
+    to = params.get("to", "")
+    subject = params.get("subject", "")
+    body = params.get("body", "")
+    success, err = await GogAPI.gmail_create_draft(to, subject, body)
+    if success:
+        await app.safe_refresh(GmailTab, "refresh_emails")
+        return f"Saved a draft email to {to or '(no recipient)'} with subject '{subject}'."
+    return f"Failed to save draft: {err}"
+
+
+async def _tool_create_task_list(app, params) -> str:
+    title = params.get("title")
+    if await GogAPI.tasks_lists_create(title):
+        await app.safe_refresh(TasksTab, "refresh_tasklists")
+        return f"Created task list '{title}'."
+    return "Failed to create task list."
+
+
+async def _tool_switch_account(app, params) -> str:
+    email = params.get("email")
+    await app.switch_account(email)
+    return f"Switched the active account to {email}."
+
+
+async def _tool_star_email(app, params) -> str:
+    thread_id = _selected_thread_id(app, params)
+    if not thread_id:
+        return "Error: no email is selected and no thread_id was given."
+    if await GogAPI.gmail_modify_labels(thread_id, add="STARRED"):
+        await app.safe_refresh(GmailTab, "refresh_emails")
+        return "Starred the email."
+    return "Failed to star the email."
+
+
+async def _tool_label_email(app, params) -> str:
+    label = params.get("label")
+    thread_id = _selected_thread_id(app, params)
+    if not thread_id:
+        return "Error: no email is selected and no thread_id was given."
+    if await GogAPI.gmail_modify_labels(thread_id, add=label):
+        await app.safe_refresh(GmailTab, "refresh_emails")
+        return f"Applied label '{label}' to the email."
+    return f"Failed to apply label '{label}'."
+
+
+async def _tool_share_file(app, params) -> str:
+    file_id = params.get("file_id")
+    email = params.get("email")
+    role = params.get("role") or "reader"
+    success, err = await GogAPI.drive_share(file_id, email, role=role, notify=True)
+    if success:
+        await app.safe_refresh(DriveTab, "refresh_files")
+        return f"Shared file {file_id} with {email} as {role}."
+    return f"Failed to share file: {err}"
+
+
+async def _tool_edit_event(app, params) -> str:
+    event_id = params.get("event_id")
+    success, err = await GogAPI.calendar_update_event(
+        "primary", event_id,
+        summary=params.get("summary"), start_time=params.get("start"),
+        end_time=params.get("end"), description=params.get("description"),
+        location=params.get("location"),
+    )
+    if success:
+        await app.safe_refresh(CalendarTab, "refresh_calendar")
+        return f"Updated calendar event {event_id}."
+    return f"Failed to update event: {err}"
+
+
 # Each param: (name, required, example). Optional params have a "" example default.
 TOOLS = [
     {
@@ -354,6 +437,52 @@ TOOLS = [
                        "for the user to review",
         "params": [("instructions", False, "politely accept the invitation")],
         "handler": _tool_draft_reply,
+    },
+    {
+        "name": "save_draft",
+        "description": "Save a draft email (does not send it)",
+        "params": [("to", False, "recipient@example.com"), ("subject", False, "Subject"),
+                   ("body", False, "Body content")],
+        "handler": _tool_save_draft,
+    },
+    {
+        "name": "create_task_list",
+        "description": "Create a new Google Tasks list",
+        "params": [("title", True, "Project tasks")],
+        "handler": _tool_create_task_list,
+    },
+    {
+        "name": "switch_account",
+        "description": "Switch the active Google account",
+        "params": [("email", True, "user@example.com")],
+        "handler": _tool_switch_account,
+    },
+    {
+        "name": "star_email",
+        "description": "Star an email (defaults to the selected thread)",
+        "params": [("thread_id", False, "")],
+        "handler": _tool_star_email,
+    },
+    {
+        "name": "label_email",
+        "description": "Apply a label to an email (defaults to the selected thread)",
+        "params": [("label", True, "Important"), ("thread_id", False, "")],
+        "handler": _tool_label_email,
+    },
+    {
+        "name": "share_file",
+        "description": "Share a Drive file with someone (find the file_id with search_drive)",
+        "params": [("file_id", True, "1AbC…"), ("email", True, "recipient@example.com"),
+                   ("role", False, "reader")],
+        "handler": _tool_share_file,
+    },
+    {
+        "name": "edit_event",
+        "description": "Edit an existing calendar event (only the fields you pass change; times are RFC3339)",
+        "params": [("event_id", True, "abc123"), ("summary", False, "New title"),
+                   ("start", False, "2026-06-11T10:00:00Z"), ("end", False, "2026-06-11T11:00:00Z"),
+                   ("location", False, "Optional Location"), ("description", False, "Optional Description")],
+        "handler": _tool_edit_event,
     },
 ]
 TOOL_BY_NAME = {t["name"]: t for t in TOOLS}
