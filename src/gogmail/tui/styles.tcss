@@ -280,6 +280,28 @@
     border: none;
 }
 
+/* Groups View */
+#groups-split {
+    layout: horizontal;
+    height: 1fr;
+}
+
+#groups-table {
+    width: 40fr;
+    height: 100%;
+}
+
+#groups-members-pane {
+    width: 60fr;
+    height: 100%;
+    layout: vertical;
+}
+
+#groups-members {
+    height: 1fr;
+    padding: 1;
+}
+
 /* AI Assistant Drawer Splitter */
 #ai-splitter {
     width: 1;

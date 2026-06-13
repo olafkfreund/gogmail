@@ -1983,3 +1983,64 @@ class KeepTab(Vertical):
         note_id = note.get("id") or note.get("name") or ""
         if note_id:
             log.write(f"\n[dim]ID: {rich_escape(note_id)}[/dim]")
+class GroupsTab(Vertical):
+    """Google Groups: groups on the left, the selected group's members on the
+    right. Groups is an Admin API and may require domain-wide delegation; any
+    permission error surfaces via the error sink."""
+
+    def compose(self):
+        yield Horizontal(
+            Label(" Google Groups ", classes="view-header"),
+            classes="view-header-row"
+        )
+        yield Horizontal(
+            DataTable(id="groups-table"),
+            Vertical(
+                RichLog(id="groups-members", highlight=True, markup=True, wrap=True, min_width=0),
+                id="groups-members-pane"
+            ),
+            id="groups-split"
+        )
+
+    def on_mount(self):
+        table = self.query_one("#groups-table")
+        table.cursor_type = "row"
+        table.add_columns("Group", "Email")
+        self.selected_group_email = None
+
+    async def refresh_groups(self):
+        self.post_message(StatusNotification("Loading groups..."))
+        table = self.query_one("#groups-table")
+        table.clear()
+        self.query_one("#groups-members").clear()
+        self.selected_group_email = None
+
+        groups = await GogAPI.groups_list()
+        self.groups_data = groups
+        for g in groups:
+            email = g.get("email") or g.get("groupKey", {}).get("id", "")
+            name = g.get("name") or g.get("displayName") or email
+            table.add_row(name, email, key=email)
+
+        self.post_message(StatusNotification("Groups loaded."))
+
+    async def refresh_members(self):
+        if not self.selected_group_email:
+            return
+        log = self.query_one("#groups-members")
+        log.clear()
+        # Escape every API string written to the RichLog (markup is enabled).
+        log.write(f"[bold]Members of {rich_escape(self.selected_group_email)}[/bold]\n")
+
+        members = await GogAPI.group_members(self.selected_group_email)
+        if not members:
+            log.write("[dim]No members to show.[/dim]")
+            return
+        for m in members:
+            email = rich_escape(m.get("email") or m.get("memberKey", {}).get("id", ""))
+            role = rich_escape(m.get("role", ""))
+            log.write(f"[cyan]{email}[/cyan] [dim]{role}[/dim]")
+
+    async def on_data_table_row_selected(self, event: DataTable.RowSelected):
+        self.selected_group_email = event.row_key.value
+        await self.refresh_members()

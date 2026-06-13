@@ -789,3 +789,20 @@ class GogAPI:
         # --force: the TUI confirms destructive ops itself, so skip gog's prompt.
         success, _ = await run_gog(["keep", "delete", note_id, "--force"])
         return success
+    # --- Groups (Cloud Identity / Workspace Admin) ---
+    # These hit an Admin API and may require domain-wide delegation / extra
+    # scopes; runtime permission errors surface via the error sink, so the
+    # wiring is correct even when the account can't read groups.
+    @staticmethod
+    async def groups_list() -> list:
+        """Groups the active account belongs to (each: email, name, description).
+
+        Reads return [] on failure (surfaced via the error sink)."""
+        success, res = await run_gog(["groups", "list"])
+        return _extract_list(success, res, "groups")
+
+    @staticmethod
+    async def group_members(group_email: str) -> list:
+        """Members of a group (each: email, role). Reads return [] on failure."""
+        success, res = await run_gog(["groups", "members", group_email])
+        return _extract_list(success, res, "members")
