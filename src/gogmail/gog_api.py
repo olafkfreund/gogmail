@@ -295,8 +295,26 @@ class GogAPI:
         return _extract_list(success, res, "calendars")
 
     @staticmethod
-    async def calendar_events(calendar_id: str = "primary") -> list:
-        success, res = await run_gog(["calendar", "events", calendar_id])
+    async def calendar_events(calendar_id: str = "primary", time_range: str = None,
+                              time_from: str = None, time_to: str = None,
+                              max_results: int = None) -> list:
+        """List events. With no range args this is the original call (used by the
+        Calendar tab); the assistant passes a range for "this week"/"today".
+        time_range: 'today' | 'tomorrow' | 'week' | 'days:<N>'. Explicit
+        time_from/time_to (RFC3339, a date, or words like 'monday') win."""
+        args = ["calendar", "events", calendar_id]
+        if time_from or time_to:
+            if time_from:
+                args += ["--from", time_from]
+            if time_to:
+                args += ["--to", time_to]
+        elif time_range in ("today", "tomorrow", "week"):
+            args.append(f"--{time_range}")
+        elif time_range and time_range.startswith("days:"):
+            args += ["--days", time_range.split(":", 1)[1]]
+        if max_results:
+            args += ["--max", str(max_results)]
+        success, res = await run_gog(args)
         return _extract_list(success, res, "events")
 
     @staticmethod

@@ -104,15 +104,94 @@ async def _tool_send_email(app, params) -> str:
     return f"Failed to send email: {err}"
 
 
+# Read tools return DATA (capped) for the model to summarize — not just status.
+_MAX_ITEMS = 15
+_MAX_CHARS = 4000
+
+
+def _truncate(text: str, limit: int = _MAX_CHARS) -> str:
+    return text if len(text) <= limit else text[:limit] + "\n…(truncated)"
+
+
 async def _tool_search_emails(app, params) -> str:
-    query = params.get("query")
-    try:
+    # Optional query (default to the inbox) so "show me my latest emails" can't
+    # loop on a missing-parameter error. Full Gmail syntax works:
+    # is:unread, newer_than:7d, label:X, from:…
+    query = params.get("query") or "label:INBOX"
+    try:  # also switch the visible Gmail view as a convenience
         app.query_one("#content-switcher").current = "gmail-view"
-        app.title = f"Google Workspace - Gmail (Search: {query})"
+        app.title = "Google Workspace - Gmail (Search)"
         await app.query_one(GmailTab).set_query(query)
-        return f"Switched to Gmail and searched for '{query}'."
-    except Exception as e:
-        return f"Error searching emails: {e}"
+    except Exception:
+        pass
+    threads = await GogAPI.gmail_search(query)
+    if not threads:
+        return f"No emails matched '{query}'."
+    rows = [f"- [{t.get('date', '')}] {t.get('from', '')[:40]} — "
+            f"{t.get('subject', '(no subject)')}" for t in threads[:_MAX_ITEMS]]
+    return _truncate(
+        f"Emails matching '{query}' ({len(threads)} found, "
+        f"showing {min(len(threads), _MAX_ITEMS)}):\n" + "\n".join(rows))
+
+
+async def _tool_list_events(app, params) -> str:
+    rng = (params.get("range") or "week").lower()
+    events = await GogAPI.calendar_events(
+        "primary", time_range=rng, time_from=params.get("from"),
+        time_to=params.get("to"), max_results=25)
+    if not events:
+        return f"No calendar events found for range '{rng}'."
+    rows = []
+    for e in events[:_MAX_ITEMS]:
+        start = e.get("start", {}).get("dateTime") or e.get("start", {}).get("date", "")
+        loc = f" @ {e.get('location')}" if e.get("location") else ""
+        rows.append(f"- {start}: {e.get('summary', '(no title)')}{loc}")
+    return _truncate(f"Calendar events ({rng}):\n" + "\n".join(rows))
+
+
+async def _tool_list_tasks(app, params) -> str:
+    tasks = await GogAPI.tasks_list("@default")
+    if not tasks:
+        return "No open tasks in your default list."
+    rows = []
+    for t in tasks[:_MAX_ITEMS]:
+        status = "done" if t.get("status") == "completed" else "open"
+        due = f" (due {t.get('due', '')[:10]})" if t.get("due") else ""
+        rows.append(f"- [{status}] {t.get('title', '')}{due}")
+    return _truncate("Tasks (default list):\n" + "\n".join(rows))
+
+
+async def _tool_search_drive(app, params) -> str:
+    query = params.get("query")
+    if not query:
+        return "Error: provide a search query (a keyword in the file name or content)."
+    files = await GogAPI.drive_search(query)
+    if not files:
+        return f"No Drive files matched '{query}'."
+    rows = [f"- {f.get('name', '')} ({f.get('mimeType', '').split('.')[-1]}) "
+            f"id={f.get('id', '')}" for f in files[:_MAX_ITEMS]]
+    return _truncate(f"Drive files matching '{query}':\n" + "\n".join(rows))
+
+
+async def _tool_read_doc(app, params) -> str:
+    doc_id = params.get("doc_id")
+    if not doc_id:
+        return "Error: provide doc_id (use search_drive to find it first)."
+    text = await GogAPI.docs_cat(doc_id)
+    if not text.strip():
+        return "The document is empty or could not be read."
+    return (_truncate("Document text:\n" + text, 6000)
+            + "\n\nNow answer the user's request about this document.")
+
+
+async def _tool_search_contacts(app, params) -> str:
+    query = params.get("query")
+    contacts = await (GogAPI.contacts_search(query) if query else GogAPI.contacts_list())
+    if not contacts:
+        return "No contacts found." if query else "Your contact list is empty."
+    rows = [f"- {GogAPI.contact_name(c) or '(no name)'} "
+            f"<{GogAPI.contact_email(c) or 'no email'}>" for c in contacts[:_MAX_ITEMS]]
+    return _truncate("Contacts:\n" + "\n".join(rows))
 
 
 async def _tool_create_event(app, params) -> str:
@@ -202,9 +281,40 @@ TOOLS = [
     },
     {
         "name": "search_emails",
-        "description": "Search emails",
-        "params": [("query", True, "is:unread")],
+        "description": "Show/search emails and return the matching list. Use Gmail "
+                       "query syntax. Omit query for the latest inbox mail.",
+        "params": [("query", False, "is:unread newer_than:7d")],
         "handler": _tool_search_emails,
+    },
+    {
+        "name": "list_events",
+        "description": "Show calendar events for a time range and return the list",
+        "params": [("range", False, "week"), ("from", False, "today"), ("to", False, "monday")],
+        "handler": _tool_list_events,
+    },
+    {
+        "name": "list_tasks",
+        "description": "Show the open tasks in the default Google Tasks list",
+        "params": [],
+        "handler": _tool_list_tasks,
+    },
+    {
+        "name": "search_drive",
+        "description": "Search Google Drive by keyword and return matching files",
+        "params": [("query", True, "quarterly report")],
+        "handler": _tool_search_drive,
+    },
+    {
+        "name": "read_doc",
+        "description": "Read a Google Doc's text (find its id with search_drive first)",
+        "params": [("doc_id", True, "1AbC…")],
+        "handler": _tool_read_doc,
+    },
+    {
+        "name": "search_contacts",
+        "description": "Look up contacts by name/email (omit query to list all)",
+        "params": [("query", False, "Beatriz")],
+        "handler": _tool_search_contacts,
     },
     {
         "name": "create_event",
@@ -250,8 +360,16 @@ def _build_system_instruction(tools) -> str:
         "Help the user manage their workspace. Keep responses concise, direct, and formatted in clean "
         "markdown text. Avoid lengthy introductions or fluff.",
         "",
-        "If the user asks you to perform an action, you MUST invoke the appropriate tool by outputting a "
-        "single JSON code block wrapped in ```json and ```. Do not include any other text if calling a tool.",
+        "You can both READ and ACT on the user's workspace through tools. To SHOW or answer "
+        "questions about emails, calendar, tasks, Drive files, docs or contacts, FIRST call the "
+        "matching read tool (search_emails, list_events, list_tasks, search_drive, read_doc, "
+        "search_contacts) to fetch the data, THEN summarize the result for the user. Never claim "
+        "you can't see something before trying its read tool. The context gives you the current "
+        "time, so resolve relative dates like 'this week' yourself.",
+        "",
+        "To call a tool, output a SINGLE JSON code block wrapped in ```json and ``` and nothing "
+        "else. When you have the data and are answering the user, reply in plain markdown with no "
+        "JSON block.",
         "",
         "Tool JSON Schemas:",
     ]
@@ -269,13 +387,41 @@ def _build_system_instruction(tools) -> str:
 SYSTEM_INSTRUCTION = _build_system_instruction(TOOLS)
 
 
+def _extract_tool_call(response_text: str):
+    """Pull a tool-call dict out of a model response, tolerant of fence variants.
+
+    Tries a ```json``` (or bare ```) fenced object first, then the first
+    balanced {...} block. Returns the dict only if it has a tool key, else None
+    (so prose responses fall through to being shown as text)."""
+    candidates = []
+    m = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', response_text, re.DOTALL)
+    if m:
+        candidates.append(m.group(1))
+    brace = re.search(r'\{.*\}', response_text, re.DOTALL)
+    if brace:
+        candidates.append(brace.group(0))
+    candidates.append(response_text.strip())
+    for cand in candidates:
+        try:
+            parsed = json.loads(cand)
+        except Exception:
+            continue
+        if isinstance(parsed, dict) and any(k in parsed for k in ("tool", "tool_name", "tool_code")):
+            return parsed
+    return None
+
+
 async def execute_tool(app, tool_name: str, params: dict) -> str:
     tool = TOOL_BY_NAME.get(tool_name)
     if tool is None:
         return f"Unknown tool: {tool_name}"
-    missing = [name for name, required, _ in tool["params"] if required and not params.get(name)]
+    missing = [(name, ex) for name, required, ex in tool["params"]
+               if required and not params.get(name)]
     if missing:
-        return f"Error: missing required parameter(s): {', '.join(missing)}."
+        # Echo the expected example so the model can self-correct instead of
+        # re-issuing the same malformed call.
+        hints = "; ".join(f"'{n}' (e.g. {ex})" for n, ex in missing)
+        return f"Error: missing required parameter(s): {hints}. Re-issue the call including them."
     return await tool["handler"](app, params)
 
 
@@ -416,8 +562,14 @@ class AIAssistantPanel(Vertical):
         log.write(f"\n[bold yellow]You:[/bold yellow] {rich_escape(prompt)}")
 
         now_str = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S%z")
+        account = getattr(self.app, "account", "") or "unknown"
+        try:
+            active_view = self.app.query_one("#content-switcher").current
+        except Exception:
+            active_view = ""
         context_desc = self._gather_context()
-        prompt_with_ctx = f"Context:\nCurrent local time: {now_str}\n"
+        prompt_with_ctx = (f"Context:\nCurrent local time: {now_str}\n"
+                           f"Active account: {account}\nActive view: {active_view}\n")
         if context_desc:
             prompt_with_ctx += context_desc
         prompt_with_ctx += f"\n---\nQuestion:\n{prompt}"
@@ -426,21 +578,12 @@ class AIAssistantPanel(Vertical):
         log.write("[italic green]Gemini is thinking...[/italic green]")
 
         async def run_ai():
-            max_steps = 5
+            max_steps = 8
             for step in range(max_steps):
                 response_text = await GeminiAPI.generate_chat(self.chat_history, SYSTEM_INSTRUCTION)
                 self.chat_history.append({"role": "model", "parts": [{"text": response_text}]})
 
-                json_match = re.search(r'```json\s*(.*?)\s*```', response_text, re.DOTALL)
-                json_str = json_match.group(1).strip() if json_match else response_text.strip()
-
-                tool_data = None
-                try:
-                    parsed = json.loads(json_str)
-                    if isinstance(parsed, dict) and any(k in parsed for k in ("tool", "tool_name", "tool_code")):
-                        tool_data = parsed
-                except Exception:
-                    pass
+                tool_data = _extract_tool_call(response_text)
 
                 if tool_data is None:
                     log.write(f"[bold green]Gemini:[/bold green] {rich_escape(response_text)}")
