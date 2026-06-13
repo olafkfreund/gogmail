@@ -2,7 +2,7 @@ from textual.screen import ModalScreen
 from textual.widgets import Input, Button, Label, TextArea, Checkbox, OptionList
 from textual.containers import Vertical, Horizontal, VerticalScroll
 from textual.suggester import Suggester
-from gogmail.gemini_api import GeminiAPI
+from gogmail.llm import get_provider
 from gogmail.gog_api import GogAPI
 
 
@@ -611,7 +611,7 @@ class GmailComposeScreen(ModalScreen):
         # Awaited (not a bare create_task) so a failure can never strand the
         # placeholder text; on error, restore what the user had written.
         try:
-            draft_text = await GeminiAPI.draft_reply(
+            draft_text = await get_provider().draft_reply(
                 original_subject=self.subject_default,
                 original_sender=self.to_default,
                 original_body=self.body_default,

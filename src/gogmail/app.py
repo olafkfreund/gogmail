@@ -25,7 +25,7 @@ from gogmail.tui.screens import (
     GmailComposeScreen, KeepCreateScreen, ThemeSelectScreen, THEMES
 )
 from gogmail.gog_api import GogAPI, set_error_sink, set_account
-from gogmail.gemini_api import GeminiAPI
+from gogmail.llm import get_provider
 from gogmail import voice
 
 DEFAULT_THEME = "gruvbox"
@@ -247,7 +247,7 @@ async def _tool_draft_reply(app, params) -> str:
     if not msg:
         return "Error: no email is selected to reply to."
     headers = msg.get("headers", {})
-    draft = await GeminiAPI.draft_reply(
+    draft = await get_provider().draft_reply(
         original_subject=headers.get("subject", ""),
         original_sender=headers.get("from", ""),
         original_body=best_email_text(msg),
@@ -532,7 +532,7 @@ async def _speak_reply(config, text: str) -> None:
     engine = (config or {}).get("tts_engine", "auto")
     if engine in ("auto", "gemini") and os.environ.get("GEMINI_API_KEY"):
         voice_name = (config or {}).get("tts_voice", "Kore")
-        wav = await GeminiAPI.synthesize_speech(text, voice_name)
+        wav = await get_provider().synthesize_speech(text, voice_name)
         if wav and await asyncio.to_thread(voice.play_wav, wav):
             return
         if engine == "gemini":
@@ -673,7 +673,7 @@ class AIAssistantPanel(Vertical):
                 os.remove(path)
             except OSError:
                 pass
-        text = await GeminiAPI.transcribe_audio(audio)
+        text = await get_provider().transcribe_audio(audio)
         text = (text or "").strip()
         if not text or text.startswith(("Error", "Exception")):
             self.app.notify_status("Could not transcribe the audio.", error=True)
@@ -742,7 +742,7 @@ class AIAssistantPanel(Vertical):
         async def run_ai():
             max_steps = 8
             for step in range(max_steps):
-                response_text = await GeminiAPI.generate_chat(self.chat_history, SYSTEM_INSTRUCTION)
+                response_text = await get_provider().generate_chat(self.chat_history, SYSTEM_INSTRUCTION)
                 self.chat_history.append({"role": "model", "parts": [{"text": response_text}]})
 
                 tool_data = _extract_tool_call(response_text)
