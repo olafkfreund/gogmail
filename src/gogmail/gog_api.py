@@ -355,6 +355,25 @@ class GogAPI:
         return _extract_list(success, res, "events")
 
     @staticmethod
+    async def calendar_freebusy(calendar_id: str, time_from: str, time_to: str) -> list:
+        """Query free/busy for a calendar (or email) over [time_from, time_to].
+
+        Wraps `gog calendar freebusy --cal <id> --from <rfc3339> --to <rfc3339>`.
+        Returns the list of busy intervals (each {"start", "end"}) for the
+        calendar, [] on failure or if it has no busy blocks. gog returns
+        `{"calendars": {"<id>": {"busy": [...]}}}`; the key may be the resolved
+        id rather than the requested one, so fall back to the single entry."""
+        success, res = await run_gog(
+            ["calendar", "freebusy", "--cal", calendar_id, "--from", time_from, "--to", time_to])
+        if not (success and isinstance(res, dict)):
+            return []
+        calendars = res.get("calendars") or {}
+        entry = calendars.get(calendar_id)
+        if entry is None and len(calendars) == 1:
+            entry = next(iter(calendars.values()))
+        return (entry or {}).get("busy", []) if isinstance(entry, dict) else []
+
+    @staticmethod
     async def calendar_create_event(calendar_id: str, summary: str, start_time: str, end_time: str, description: str = "", location: str = "") -> tuple[bool, str]:
         args = ["calendar", "create", calendar_id, "--summary", summary, "--from", start_time, "--to", end_time]
         if description:

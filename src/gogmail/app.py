@@ -21,8 +21,8 @@ from gogmail.tui.widgets import (
 )
 from gogmail.tui.screens import (
     ConfirmDialog, GmailLabelScreen, GmailAttachmentScreen, PromptDialog, SettingsScreen,
-    TaskCreateScreen, CalendarCreateScreen, ContactCreateScreen, GmailComposeScreen,
-    ThemeSelectScreen, THEMES
+    TaskCreateScreen, CalendarCreateScreen, CalendarPickerScreen, ContactCreateScreen,
+    GmailComposeScreen, ThemeSelectScreen, THEMES
 )
 from gogmail.gog_api import GogAPI, set_error_sink, set_account
 from gogmail.gemini_api import GeminiAPI
@@ -1338,6 +1338,59 @@ class GogMailApp(App):
                     lambda: self.query_one(CalendarTab).refresh_calendar(),
                 )
         self.push_screen(CalendarCreateScreen(prefill=prefill), handle_dismiss)
+
+    def open_calendar_picker_dialog(self, tab):
+        """Show the calendar picker for the Calendar tab; persist the choice on
+        the tab and reload its events when applied."""
+        async def load_and_show():
+            calendars = await GogAPI.calendar_list()
+            # Cache id -> display name on the tab so the detail panel can label events.
+            tab.calendar_names = {
+                c.get("id", ""): (c.get("summary") or c.get("summaryOverride") or c.get("id", ""))
+                for c in calendars if c.get("id")
+            }
+
+            def handle(result):
+                if result is None:  # cancelled
+                    return
+                tab.selected_calendar_ids = result
+                self.run_worker(tab.refresh_calendar())
+
+            self.push_screen(CalendarPickerScreen(calendars, tab.selected_calendar_ids), handle)
+
+        self.run_worker(load_and_show())
+
+    def open_freebusy_dialog(self, tab):
+        """Prompt for a calendar id / email and a day, then show busy intervals
+        for that day in the Calendar tab's detail panel."""
+        def ask_day(who):
+            who = (who or "").strip() or "primary"
+            today = datetime.date.today().isoformat()
+
+            def handle_day(day):
+                day = (day or "").strip()
+                if not day:
+                    return
+                self.run_worker(self._run_freebusy(tab, who, day))
+
+            self.push_screen(
+                PromptDialog("Free/Busy: which day? (YYYY-MM-DD)", "2026-06-13", today),
+                handle_day,
+            )
+
+        self.push_screen(
+            PromptDialog("Free/Busy: calendar id or email", "primary or someone@example.com", "primary"),
+            ask_day,
+        )
+
+    async def _run_freebusy(self, tab, who, day):
+        # Query the whole calendar day in UTC. gog requires RFC3339 from/to.
+        time_from = f"{day}T00:00:00Z"
+        time_to = f"{day}T23:59:59Z"
+        self.notify_status(f"Querying free/busy for {who}…")
+        busy = await GogAPI.calendar_freebusy(who, time_from, time_to)
+        tab.show_freebusy(who, day, busy)
+        self.notify_status(f"Free/busy: {len(busy)} busy interval(s) for {who} on {day}.")
 
     def open_contact_create_dialog(self):
         async def handle_dismiss(result):

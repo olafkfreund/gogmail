@@ -1,6 +1,6 @@
 from textual.screen import ModalScreen
 from textual.widgets import Input, Button, Label, TextArea, Checkbox, OptionList
-from textual.containers import Vertical, Horizontal
+from textual.containers import Vertical, Horizontal, VerticalScroll
 from textual.suggester import Suggester
 from gogmail.gemini_api import GeminiAPI
 from gogmail.gog_api import GogAPI
@@ -357,6 +357,52 @@ class CalendarCreateScreen(ModalScreen):
             })
         else:
             self.dismiss(None)
+
+
+class CalendarPickerScreen(ModalScreen):
+    """Choose which calendars are shown on the Calendar tab.
+
+    Takes the calendar list (each {"id", "summary", ...}) plus the currently
+    selected ids, renders one checkbox per calendar, and dismisses with the
+    list of checked ids (possibly empty) or None on cancel. An empty list means
+    "primary only" to the caller.
+    """
+    def __init__(self, calendars: list, selected_ids=None):
+        super().__init__()
+        self._calendars = calendars or []
+        self._selected = set(selected_ids or [])
+
+    def compose(self):
+        boxes = []
+        for idx, cal in enumerate(self._calendars):
+            cal_id = cal.get("id", "")
+            label = cal.get("summary") or cal.get("summaryOverride") or cal_id
+            if cal.get("primary"):
+                label = f"{label} (primary)"
+            boxes.append(Checkbox(label, value=cal_id in self._selected, id=f"cal-pick-{idx}"))
+        yield Vertical(
+            Label("Show calendars", classes="dialog-title"),
+            Label("Pick the calendars to display. None selected = primary only."
+                  if self._calendars else "No calendars found."),
+            VerticalScroll(*boxes, id="cal-pick-list"),
+            Horizontal(
+                Button("Apply", variant="success", id="cal-pick-apply-btn"),
+                Button("Cancel", id="cancel-btn"),
+                classes="btn-row",
+            ),
+            id="dialog-container",
+        )
+
+    def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "cal-pick-apply-btn":
+            chosen = []
+            for idx, cal in enumerate(self._calendars):
+                if self.query_one(f"#cal-pick-{idx}", Checkbox).value:
+                    chosen.append(cal.get("id", ""))
+            self.dismiss([c for c in chosen if c])
+        else:
+            self.dismiss(None)
+
 
 class ContactCreateScreen(ModalScreen):
     """Modal screen for creating or editing a Google contact.
