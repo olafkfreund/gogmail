@@ -1390,6 +1390,9 @@ class ContactsTab(Vertical):
         )
         yield Horizontal(
             Button("Email Contact", variant="success", id="contacts-email-btn"),
+            Button("New Contact", variant="primary", id="contacts-new-btn"),
+            Button("Edit Contact", id="contacts-edit-btn"),
+            Button("Delete Contact", variant="error", id="contacts-del-btn"),
             Button("Refresh", id="contacts-ref-btn"),
             classes="btn-row"
         )
@@ -1438,9 +1441,22 @@ class ContactsTab(Vertical):
             {},
         )
 
+    @staticmethod
+    def _contact_phone(contact: dict) -> str:
+        """Primary phone for a contact dict (handles flat and nested shapes)."""
+        if contact.get("phone"):
+            return contact["phone"]
+        for p in contact.get("phoneNumbers", []):
+            if p.get("value"):
+                return p["value"]
+        return ""
+
     async def on_button_pressed(self, event: Button.Pressed):
         if event.button.id == "contacts-ref-btn":
             await self.refresh_contacts()
+            return
+        if event.button.id == "contacts-new-btn":
+            self.app.open_contact_create_dialog()
             return
         if event.button.id == "contacts-email-btn":
             contact = self._selected_contact()
@@ -1453,6 +1469,28 @@ class ContactsTab(Vertical):
                 return
             name = GogAPI.contact_name(contact)
             self.app.open_compose_dialog(to=f"{name} <{email}>" if name else email)
+            return
+        if event.button.id == "contacts-edit-btn":
+            contact = self._selected_contact()
+            if not contact:
+                self.post_message(StatusNotification("Select a contact first.", is_error=True))
+                return
+            self.app.open_contact_edit_dialog(contact)
+            return
+        if event.button.id == "contacts-del-btn":
+            contact = self._selected_contact()
+            if not contact:
+                self.post_message(StatusNotification("Select a contact first.", is_error=True))
+                return
+            resource = contact.get("resource") or contact.get("resourceName") or ""
+            name = GogAPI.contact_name(contact) or "(No Name)"
+
+            async def do_delete():
+                await GogAPI.contacts_delete(resource)
+                self.post_message(StatusNotification("Contact deleted."))
+                await self.refresh_contacts()
+            self.app.confirm(f"Delete contact “{name}”?", do_delete)
+            return
 
     async def on_data_table_row_selected(self, event: DataTable.RowSelected):
         res_name = event.row_key.value

@@ -283,6 +283,50 @@ class CalendarCreateScreen(ModalScreen):
         else:
             self.dismiss(None)
 
+class ContactCreateScreen(ModalScreen):
+    """Modal screen for creating or editing a Google contact.
+
+    Pass a `prefill` dict (with name/email/phone) to edit an existing contact;
+    omit it to create a new one. Returns {name, email, phone} on save.
+    """
+    def __init__(self, prefill: dict = None):
+        super().__init__()
+        self.prefill = prefill or {}
+
+    def compose(self):
+        p = self.prefill
+        editing = bool(p)
+        yield Vertical(
+            Label("Edit Contact" if editing else "New Contact", classes="dialog-title"),
+            Label("Name:"),
+            Input(value=p.get("name", ""), placeholder="Full name", id="contact-name"),
+            Label("Email:"),
+            Input(value=p.get("email", ""), placeholder="name@example.com", id="contact-email"),
+            Label("Phone:"),
+            Input(value=p.get("phone", ""), placeholder="+1 555 123 4567", id="contact-phone"),
+            Horizontal(
+                Button("Save" if editing else "Create", variant="success", id="create-btn"),
+                Button("Cancel", id="cancel-btn"),
+                classes="btn-row"
+            ),
+            id="contact-create-container",
+            classes="side-panel",
+        )
+
+    def on_mount(self):
+        self.query_one("#contact-name").focus()
+
+    def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "create-btn":
+            self.dismiss({
+                "name": self.query_one("#contact-name").value.strip(),
+                "email": self.query_one("#contact-email").value.strip(),
+                "phone": self.query_one("#contact-phone").value.strip(),
+            })
+        else:
+            self.dismiss(None)
+
+
 class GmailComposeScreen(ModalScreen):
     """Modal screen to compose or reply to emails with built-in Gemini drafting."""
     def __init__(self, to: str = "", subject: str = "", body: str = "", thread_id: str = None, reply_to_message_id: str = None):
