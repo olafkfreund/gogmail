@@ -343,6 +343,7 @@ class GmailTab(Vertical):
                 yield Horizontal(
                     Button("Compose", variant="success", id="gmail-compose-btn"),
                     Button("Refresh", variant="primary", id="gmail-refresh-btn"),
+                    Button("Load more", variant="primary", id="gmail-load-more-btn"),
                     classes="btn-row"
                 )
                 yield DataTable(id="email-table")
@@ -364,10 +365,17 @@ class GmailTab(Vertical):
                 )
                 yield RichLog(id="email-body-view", highlight=True, markup=True, wrap=True, min_width=0)
 
+    # Page size for each gog gmail search request. Larger than gog's default of
+    # 10 so big mailboxes page in fewer, chunkier requests.
+    PAGE_SIZE = 25
+
     def on_mount(self):
         table = self.query_one("#email-table")
         table.cursor_type = "row"
         table.add_columns("Date", "From", "Subject", "Labels")
+        # No results loaded yet, so there's nothing more to load.
+        self.next_token = ""
+        self.query_one("#gmail-load-more-btn").display = False
 
     async def set_query(self, query: str):
         self.query_one("#email-search-input").value = query
@@ -395,15 +403,24 @@ class GmailTab(Vertical):
             pass
 
     async def _do_refresh_emails(self, query: str):
+        # A fresh search/refresh resets pagination: clear the table + data and
+        # start from the first page.
         self.post_message(StatusNotification("Fetching emails..."))
         table = self.query_one("#email-table")
         table.clear()
-        
-        threads = await GogAPI.gmail_search(query)
-        self.threads_data = threads
-        
+        self.threads_data = []
+        self.next_token = ""
+
+        threads, next_token = await GogAPI.gmail_search_page(query, max_results=self.PAGE_SIZE)
+        self._append_threads(threads, next_token)
+        self._notify_loaded()
+
+    def _append_threads(self, threads: list, next_token: str):
+        """Append fetched threads to the table + threads_data and update the
+        Load more button from the new page token (shown only when more remain)."""
+        table = self.query_one("#email-table")
         hidden_labels = {"CATEGORY_UPDATES", "CATEGORY_PERSONAL", "UNREAD"}
-        for idx, t in enumerate(threads):
+        for t in threads:
             labels = t.get("labels", [])
             labels_str = ", ".join(l for l in labels if l not in hidden_labels)
             # Unread rows are bold (the UNREAD label itself is hidden as noise).
@@ -415,7 +432,25 @@ class GmailTab(Vertical):
                 Text(labels_str, style="dim"),
                 key=t.get("id")
             )
-        self.post_message(StatusNotification(f"Loaded {len(threads)} emails."))
+        self.threads_data = getattr(self, "threads_data", []) + threads
+        self.next_token = next_token
+        self.query_one("#gmail-load-more-btn").display = bool(next_token)
+
+    def _notify_loaded(self):
+        n = len(getattr(self, "threads_data", []))
+        suffix = " (more available)" if self.next_token else ""
+        self.post_message(StatusNotification(f"Loaded {n}{suffix}."))
+
+    async def _load_more_emails(self):
+        """Fetch the next page and APPEND its rows (never clears the table)."""
+        if not getattr(self, "next_token", ""):
+            return
+        self.post_message(StatusNotification("Loading more emails..."))
+        threads, next_token = await GogAPI.gmail_search_page(
+            getattr(self, "current_query", "is:unread"),
+            max_results=self.PAGE_SIZE, page_token=self.next_token)
+        self._append_threads(threads, next_token)
+        self._notify_loaded()
 
     async def on_input_submitted(self, event: Input.Submitted):
         if event.input.id == "email-search-input":
@@ -474,6 +509,9 @@ class GmailTab(Vertical):
             return
         elif event.button.id == "gmail-refresh-btn":
             await self.refresh_emails()
+            return
+        elif event.button.id == "gmail-load-more-btn":
+            await self._load_more_emails()
             return
         elif event.button.id == "gmail-back-btn":
             self.query_one("#gmail-switcher").current = "gmail-list-view"

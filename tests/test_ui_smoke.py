@@ -34,6 +34,10 @@ class TestUiSmoke(unittest.IsolatedAsyncioTestCase):
             mock.patch.object(GogAPI, "list_accounts", _async(["demo@x.example"])),
             mock.patch.object(GogAPI, "gmail_search", _async(
                 [{"id": "t1", "date": "2026-06-10", "from": "a@x.example", "subject": "Hi", "labels": ["INBOX"]}])),
+            # GmailTab pages via gmail_search_page (it needs the nextPageToken);
+            # return one thread and no further pages.
+            mock.patch.object(GogAPI, "gmail_search_page", _async(
+                ([{"id": "t1", "date": "2026-06-10", "from": "a@x.example", "subject": "Hi", "labels": ["INBOX"]}], ""))),
             mock.patch.object(GogAPI, "gmail_get_message", _async(
                 {"headers": {"from": "a@x.example", "subject": "Hi", "date": "2026-06-10"},
                  "body": "Hello there", "message": {"payload": {}}})),

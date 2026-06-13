@@ -193,8 +193,28 @@ class GogAPI:
     # --- Gmail ---
     @staticmethod
     async def gmail_search(query: str = "is:unread") -> list:
-        success, res = await run_gog(["gmail", "search", query])
-        return _extract_list(success, res, "threads")
+        threads, _ = await GogAPI.gmail_search_page(query)
+        return threads
+
+    @staticmethod
+    async def gmail_search_page(query: str = "is:unread", max_results: int = 25,
+                                page_token: str = None) -> tuple[list, str]:
+        """Search one page of threads, returning (threads, next_page_token).
+
+        Passes `--max` and (when paging) `--page`. Reads the `nextPageToken`
+        from the JSON envelope so callers can fetch the following page; an empty
+        string means there are no more results. Reads return ([], "") on failure
+        (surfaced via the error sink). NB: do NOT pass `--results-only` here, as
+        it drops the envelope (and thus the token)."""
+        args = ["gmail", "search", query, "--max", str(max_results)]
+        if page_token:
+            args += ["--page", page_token]
+        success, res = await run_gog(args)
+        threads = _extract_list(success, res, "threads")
+        next_token = ""
+        if success and isinstance(res, dict):
+            next_token = res.get("nextPageToken") or ""
+        return threads, next_token
 
     @staticmethod
     async def gmail_get_message(message_id: str) -> dict:
