@@ -3,12 +3,30 @@ import json
 import logging
 import os
 
-# Log under the XDG state dir, never the cwd (which may be a shared/tracked dir).
-_log_dir = os.path.join(
-    os.environ.get("XDG_STATE_HOME", os.path.expanduser("~/.local/state")), "gogmail")
-os.makedirs(_log_dir, exist_ok=True)
-logging.basicConfig(level=logging.INFO, filename=os.path.join(_log_dir, "gogmail.log"),
-                    filemode="a", format="%(asctime)s - %(levelname)s - %(message)s")
+
+def _configure_logging() -> None:
+    """Log to the XDG state dir (never the cwd). Must never crash on import:
+    a read-only HOME (Nix build sandbox, locked-down accounts) would otherwise
+    take down the whole module, so fall back to a temp file and finally to no
+    file logging at all."""
+    fmt = "%(asctime)s - %(levelname)s - %(message)s"
+    base = os.environ.get("XDG_STATE_HOME") or os.path.expanduser("~/.local/state")
+    candidates = [os.path.join(base, "gogmail")]
+    import tempfile
+    candidates.append(os.path.join(tempfile.gettempdir(), "gogmail"))
+    for d in candidates:
+        try:
+            os.makedirs(d, exist_ok=True)
+            logging.basicConfig(level=logging.INFO, filename=os.path.join(d, "gogmail.log"),
+                                filemode="a", format=fmt)
+            return
+        except OSError:
+            continue
+    # Last resort: in-memory/stderr handler so logging calls still work.
+    logging.basicConfig(level=logging.INFO, format=fmt, handlers=[logging.NullHandler()])
+
+
+_configure_logging()
 
 # --- Error surfacing -------------------------------------------------------
 # Reads return empty values on failure so call sites stay simple, but a failed
