@@ -4,6 +4,7 @@ from textual.message import Message
 from gogmail.gog_api import GogAPI
 from gogmail.llm import get_provider
 from gogmail.zoom_api import ZoomAPI
+from gogmail import images
 import asyncio
 import base64
 import calendar
@@ -2127,7 +2128,39 @@ class PhotosTab(Vertical):
             log.write(f"\n[blue underline]{rich_escape(url)}[/blue underline]")
         item_id = item.get("id") or ""
         if item_id:
-            log.write(f"\n[dim]ID: {rich_escape(item_id)}[/dim]")
+            log.write(f"[dim]ID: {rich_escape(item_id)}[/dim]")
+
+        # A baseUrl is a temporary Photos URL; appending a size param returns a
+        # downscaled thumbnail. Fetch + render it off the UI thread (network).
+        base_url = item.get("baseUrl")
+        if base_url:
+            log.write("\n[dim]Loading thumbnail…[/dim]")
+            self.run_worker(self._load_thumbnail(item, base_url), exclusive=True)
+
+    async def _load_thumbnail(self, item: dict, base_url: str):
+        thumb_url = f"{base_url}=w480-h480"
+        data = await asyncio.to_thread(images.fetch_image_bytes, thumb_url)
+        log = self.query_one("#photos-detail")
+        # Bail if the selection changed while we fetched.
+        if self._selected_item().get("id") != item.get("id"):
+            return
+        rendered = None
+        if data:
+            rendered = await asyncio.to_thread(
+                images.render_image, data, 50, 24
+            )
+        filename = item.get("filename") or "(unnamed)"
+        created = (item.get("mediaMetadata") or {}).get("creationTime") or ""
+        if rendered is None:
+            mime = item.get("mimeType") or ""
+            log.write(f"[yellow]No preview for {rich_escape(filename)}"
+                      f"{(' (' + rich_escape(mime) + ')') if mime else ''}[/yellow]")
+            return
+        log.write(rendered)
+        caption = rich_escape(filename)
+        if created:
+            caption += f" — {rich_escape(created)}"
+        log.write(f"[dim]{caption}[/dim]")
 
 
 class YouTubeTab(Vertical):
