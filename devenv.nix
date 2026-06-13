@@ -16,6 +16,8 @@
         textual>=0.50.0
         requests>=2.31.0
         rich>=13.7.0
+        rich-pixels>=3.0.0
+        pillow>=10.0.0
       '';
     };
   };

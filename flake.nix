@@ -52,7 +52,7 @@
 
             nativeBuildInputs = [ pkgs.makeWrapper ];
             build-system = [ python.pkgs.setuptools ];
-            dependencies = with python.pkgs; [ textual requests rich ];
+            dependencies = with python.pkgs; [ textual requests rich rich-pixels pillow ];
 
             # The unit suite is stdlib unittest and hermetic (gog/network mocked).
             doCheck = true;
@@ -90,7 +90,7 @@
           # `nix develop`
           devShells.default = pkgs.mkShell {
             packages = [
-              (python.withPackages (ps: with ps; [ textual requests rich ]))
+              (python.withPackages (ps: with ps; [ textual requests rich rich-pixels pillow ]))
               pkgs.just
             ] ++ runtimeDeps;
             shellHook = ''
