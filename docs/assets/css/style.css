@@ -124,8 +124,7 @@ section h2::before { content: "## "; color: var(--bg3); }
   border-radius: 10px; padding: 1.3rem;
 }
 .card:hover { border-color: var(--bg3); }
-.card .ico { font-size: 1.5rem; }
-.card h3 { margin: 0.4rem 0 0.4rem; color: var(--yellow); font-size: 1.1rem; }
+.card h3 { margin: 0 0 0.4rem; color: var(--yellow); font-size: 1.1rem; }
 .card p { margin: 0; color: var(--fg-dim); font-size: 0.95rem; }
 
 /* screenshot gallery */

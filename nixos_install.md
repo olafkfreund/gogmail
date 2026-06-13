@@ -67,7 +67,7 @@ gog auth list        # shows all stored accounts
 ## Using multiple Google accounts
 
 GogMail reads every authenticated account from `gog auth list`. In the app, open
-the **👤 Accounts** node in the sidebar and pick an account to switch — the
+the **Accounts** node in the sidebar and pick an account to switch — the
 active account is shown in the status bar, persisted to
 `~/.config/gogmail/settings.json`, and every view reloads under it. Set an
 initial account with `defaultAccount`/`$GOG_ACCOUNT`, or leave it unset and the

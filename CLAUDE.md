@@ -35,7 +35,7 @@ Runtime prerequisites (the app will not function without these):
 
 Nix outputs (`flake.nix`): `packages`/`apps`/`devShells`/`checks` per system, plus `nixosModules.gogmail` and `homeManagerModules.gogmail`. Both modules expose `programs.gogmail` with `geminiApiKeyFile` (secret-safe, read at runtime via a wrapper) and a literal `geminiApiKey` (warns: world-readable store). Python deps are declared in **three** places that must stay in sync: `pyproject.toml`, `devenv.nix`, `flake.nix`.
 
-**Multiple accounts:** `gog` is multi-account; `run_gog` scopes API calls to the active account via `-a <email>` (set with `set_account`, never applied to `auth` commands). The app lists accounts via `GogAPI.list_accounts()`, shows them under the sidebar **👤 Accounts** node, and `switch_account()` changes the active one (persisted to config, resets tab `_loaded` flags, reloads).
+**Multiple accounts:** `gog` is multi-account; `run_gog` scopes API calls to the active account via `-a <email>` (set with `set_account`, never applied to `auth` commands). The app lists accounts via `GogAPI.list_accounts()`, shows them under the sidebar **Accounts** node, and `switch_account()` changes the active one (persisted to config, resets tab `_loaded` flags, reloads).
 
 > Note: the real working clone is `/home/olafkfreund/Source/GitHub/gogmail`. The `/mnt/data/...` primary dir is empty.
 

@@ -7,7 +7,7 @@
 
 A modern, premium, feature-rich Terminal User Interface (TUI) client for Linux that brings Google Workspace and Zoom services directly into your terminal.
 
-**🌐 Showcase & blog: [olafkfreund.github.io/gogmail](https://olafkfreund.github.io/gogmail/)**
+**Showcase & blog: [olafkfreund.github.io/gogmail](https://olafkfreund.github.io/gogmail/)**
 
 ![GogMail inbox](docs/assets/img/inbox.png)
 
@@ -124,4 +124,4 @@ just lint    # syntax check (py_compile)
 
 ---
 
-<p align="center"><sub>✨ Created using <a href="https://claude.com/claude-code">Claude Code</a></sub></p>
+<p align="center"><sub>Created using <a href="https://claude.com/claude-code">Claude Code</a></sub></p>

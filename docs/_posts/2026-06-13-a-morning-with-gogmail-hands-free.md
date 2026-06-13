@@ -12,7 +12,7 @@ to show how it fits together.
 
 ## 08:55 — "What's waiting for me?"
 
-I open GogMail in a tmux pane, click the **🎙️ Talk** button in the Gemini drawer,
+I open GogMail in a tmux pane, click the **Talk** button in the Gemini drawer,
 and say:
 
 > "Show me my latest emails."
@@ -50,7 +50,7 @@ through your system audio, with `espeak` kept only as an offline fallback.
 
 Jordan wants to reschedule. I hit **Reply** and the compose window slides in as a
 **right-docked panel** — Gmail-web style — so I can still see the thread behind
-it. Need more room? The **⛶ Fullscreen** toggle expands it to the whole client and
+it. Need more room? The **Fullscreen** toggle expands it to the whole client and
 back. I let Gemini draft the reply ("propose Thursday 2pm, keep it warm"), tweak a
 line, and send.
 

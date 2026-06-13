@@ -34,7 +34,7 @@ layout: default
         <span class="title mono">~/gogmail — nix run github:olafkfreund/gogmail</span>
       </div>
       <div class="demo-frames">
-        {% assign demo = "inbox|✉️  Gmail inbox + Gemini panel,calendar-month|📅  Calendar · month view,drive|📁  Google Drive files,tasks-detail|✓  Google Tasks,chat|💬  Google Chat spaces" | split: "," %}
+        {% assign demo = "inbox|Gmail inbox + Gemini panel,calendar-month|Calendar · month view,drive|Google Drive files,tasks-detail|Google Tasks,chat|Google Chat spaces" | split: "," %}
         {% for d in demo %}
           {% assign parts = d | split: "|" %}
           <figure>
@@ -72,21 +72,21 @@ layout: default
     <h2>Features</h2>
     <p class="section-sub">Every Workspace service, one consistent interface.</p>
     <div class="grid">
-      <div class="card"><div class="ico">✉️</div><h3>Gmail</h3><p>Read, search (paginated), compose, reply, star, label/move, drafts, attachments. HTML rendered to clean text with a plain-text fallback, and <b>inline images shown in-client</b> (remote images opt-in to block trackers).</p></div>
-      <div class="card"><div class="ico">📅</div><h3>Calendar</h3><p>Month, week and day views with a details panel. Create, edit, delete and RSVP to events, a multi-calendar picker and free/busy lookup, with Tasks alongside your agenda.</p></div>
-      <div class="card"><div class="ico">📁</div><h3>Drive</h3><p>Browse, search, upload, download, folders, share/rename/move, and an <b>inline image-preview</b> pane. Open files in the browser — Docs/Sheets/Slides in their editors.</p></div>
-      <div class="card"><div class="ico">📝</div><h3>Docs · Sheets · Slides · Forms</h3><p>List and open documents, read Docs inline, render Sheets in a grid, and create new files from a single shared tab base.</p></div>
-      <div class="card"><div class="ico">✓</div><h3>Tasks</h3><p>Multiple task lists, complete/uncomplete, add and delete — kept in sync with the calendar.</p></div>
-      <div class="card"><div class="ico">👤</div><h3>Contacts</h3><p>Fast directory search, a details card, and a one-key “Email Contact” that opens Compose pre-filled.</p></div>
-      <div class="card"><div class="ico">💬</div><h3>Meet · Zoom · Chat</h3><p>Spin up a Meet space, <b>create Zoom meetings</b> that launch your Zoom client, and read/post in Google Chat (with real participant names).</p></div>
-      <div class="card"><div class="ico">🤖</div><h3>Gemini assistant</h3><p>Agentic read <em>and</em> act: ask “show my latest emails”, “what’s on my calendar this week”, “find the doc about X” — it fetches via <code>gog</code>, summarizes, <b>and opens the matching view</b> populated. Plus send, draft, and create.</p></div>
-      <div class="card"><div class="ico">🎙️</div><h3>Voice control</h3><p>Push-to-talk: speak a command and it’s transcribed to drive the assistant. Optional spoken replies in Google’s natural <b>Gemini TTS</b> voice. Toggle both in Settings.</p></div>
-      <div class="card"><div class="ico">🗂️</div><h3>More services</h3><p>Keep notes, Google Groups + members, and opt-in Photos (with thumbnails), YouTube, Classroom and Sites tabs — each toggled on in Settings once its API is enabled.</p></div>
-      <div class="card"><div class="ico">📦</div><h3>Packaged &amp; signed</h3><p>Install via Nix, or signed <code>.deb</code>/<code>.rpm</code>/zipapp releases that ship an SBOM, vulnerability scans and a cosign-signed checksum — no secrets bundled.</p></div>
-      <div class="card"><div class="ico">🪪</div><h3>Multiple accounts</h3><p>Switch between every authenticated Google account from the sidebar; the choice persists and every view reloads under it.</p></div>
-      <div class="card"><div class="ico">🎨</div><h3>Six themes</h3><p>Gruvbox, Catppuccin, Nord, Dracula, Monokai, Solarized — switched live and remembered.</p></div>
-      <div class="card"><div class="ico">⌨️</div><h3>Keyboard &amp; mouse</h3><p>Full tab/arrow/enter navigation and clickable everything. tmux-friendly key bindings (F2/F3) and a draggable AI panel.</p></div>
-      <div class="card"><div class="ico">❄️</div><h3>Nix-native</h3><p>A flake with <code>nix run</code>, <code>nix develop</code>, and <code>nix flake check</code>, plus NixOS and Home Manager modules with secret-safe API keys.</p></div>
+      <div class="card"><h3>Gmail</h3><p>Read, search (paginated), compose, reply, star, label/move, drafts, attachments. HTML rendered to clean text with a plain-text fallback, and <b>inline images shown in-client</b> (remote images opt-in to block trackers).</p></div>
+      <div class="card"><h3>Calendar</h3><p>Month, week and day views with a details panel. Create, edit, delete and RSVP to events, a multi-calendar picker and free/busy lookup, with Tasks alongside your agenda.</p></div>
+      <div class="card"><h3>Drive</h3><p>Browse, search, upload, download, folders, share/rename/move, and an <b>inline image-preview</b> pane. Open files in the browser — Docs/Sheets/Slides in their editors.</p></div>
+      <div class="card"><h3>Docs · Sheets · Slides · Forms</h3><p>List and open documents, read Docs inline, render Sheets in a grid, and create new files from a single shared tab base.</p></div>
+      <div class="card"><h3>Tasks</h3><p>Multiple task lists, complete/uncomplete, add and delete — kept in sync with the calendar.</p></div>
+      <div class="card"><h3>Contacts</h3><p>Fast directory search, a details card, and a one-key “Email Contact” that opens Compose pre-filled.</p></div>
+      <div class="card"><h3>Meet · Zoom · Chat</h3><p>Spin up a Meet space, <b>create Zoom meetings</b> that launch your Zoom client, and read/post in Google Chat (with real participant names).</p></div>
+      <div class="card"><h3>Gemini assistant</h3><p>Agentic read <em>and</em> act: ask “show my latest emails”, “what’s on my calendar this week”, “find the doc about X” — it fetches via <code>gog</code>, summarizes, <b>and opens the matching view</b> populated. Plus send, draft, and create.</p></div>
+      <div class="card"><h3>Voice control</h3><p>Push-to-talk: speak a command and it’s transcribed to drive the assistant. Optional spoken replies in Google’s natural <b>Gemini TTS</b> voice. Toggle both in Settings.</p></div>
+      <div class="card"><h3>More services</h3><p>Keep notes, Google Groups + members, and opt-in Photos (with thumbnails), YouTube, Classroom and Sites tabs — each toggled on in Settings once its API is enabled.</p></div>
+      <div class="card"><h3>Packaged &amp; signed</h3><p>Install via Nix, or signed <code>.deb</code>/<code>.rpm</code>/zipapp releases that ship an SBOM, vulnerability scans and a cosign-signed checksum — no secrets bundled.</p></div>
+      <div class="card"><h3>Multiple accounts</h3><p>Switch between every authenticated Google account from the sidebar; the choice persists and every view reloads under it.</p></div>
+      <div class="card"><h3>Six themes</h3><p>Gruvbox, Catppuccin, Nord, Dracula, Monokai, Solarized — switched live and remembered.</p></div>
+      <div class="card"><h3>Keyboard &amp; mouse</h3><p>Full tab/arrow/enter navigation and clickable everything. tmux-friendly key bindings (F2/F3) and a draggable AI panel.</p></div>
+      <div class="card"><h3>Nix-native</h3><p>A flake with <code>nix run</code>, <code>nix develop</code>, and <code>nix flake check</code>, plus NixOS and Home Manager modules with secret-safe API keys.</p></div>
     </div>
   </div>
 </section>
