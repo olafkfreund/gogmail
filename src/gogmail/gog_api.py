@@ -544,6 +544,55 @@ class GogAPI:
         return suggestions
 
     @staticmethod
+    def _split_name(name: str) -> tuple[str, str]:
+        """Split a display name into (given, family) for the People API.
+
+        `gog contacts create/update` take separate --given/--family flags, but
+        the TUI works with a single display name. Everything before the last
+        space is the given name; the last token is the family name.
+        """
+        parts = (name or "").strip().split()
+        if not parts:
+            return "", ""
+        if len(parts) == 1:
+            return parts[0], ""
+        return " ".join(parts[:-1]), parts[-1]
+
+    @classmethod
+    async def contacts_create(cls, name: str, email: str = None, phone: str = None) -> tuple[bool, str]:
+        given, family = cls._split_name(name)
+        args = ["contacts", "create", "--given", given]
+        if family:
+            args += ["--family", family]
+        if email:
+            args += ["--email", email]
+        if phone:
+            args += ["--phone", phone]
+        success, res = await run_gog(args)
+        return success, _str_result(res)
+
+    @classmethod
+    async def contacts_update(cls, resource_name: str, name: str = None,
+                              email: str = None, phone: str = None) -> tuple[bool, str]:
+        """Update a contact. Only provided fields are changed."""
+        args = ["contacts", "update", resource_name]
+        if name is not None:
+            given, family = cls._split_name(name)
+            args += ["--given", given, "--family", family]
+        if email is not None:
+            args += ["--email", email]
+        if phone is not None:
+            args += ["--phone", phone]
+        success, res = await run_gog(args)
+        return success, _str_result(res)
+
+    @staticmethod
+    async def contacts_delete(resource_name: str) -> bool:
+        # --force: the TUI confirms destructive ops itself, so skip gog's prompt.
+        success, _ = await run_gog(["contacts", "delete", resource_name, "--force"])
+        return success
+
+    @staticmethod
     async def people_me() -> dict:
         success, res = await run_gog(["people", "me"])
         return res if success else {}

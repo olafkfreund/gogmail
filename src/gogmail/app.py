@@ -21,7 +21,8 @@ from gogmail.tui.widgets import (
 )
 from gogmail.tui.screens import (
     ConfirmDialog, GmailLabelScreen, GmailAttachmentScreen, PromptDialog, SettingsScreen,
-    TaskCreateScreen, CalendarCreateScreen, GmailComposeScreen, ThemeSelectScreen, THEMES
+    TaskCreateScreen, CalendarCreateScreen, ContactCreateScreen, GmailComposeScreen,
+    ThemeSelectScreen, THEMES
 )
 from gogmail.gog_api import GogAPI, set_error_sink, set_account
 from gogmail.gemini_api import GeminiAPI
@@ -1208,6 +1209,44 @@ class GogMailApp(App):
                     lambda: self.query_one(CalendarTab).refresh_calendar(),
                 )
         self.push_screen(CalendarCreateScreen(prefill=prefill), handle_dismiss)
+
+    def open_contact_create_dialog(self):
+        async def handle_dismiss(result):
+            if result and result.get("name"):
+                await self._run_mutation(
+                    "Creating contact...",
+                    GogAPI.contacts_create(
+                        name=result.get("name"),
+                        email=result.get("email") or None,
+                        phone=result.get("phone") or None,
+                    ),
+                    "Contact created.",
+                    lambda: self.query_one(ContactsTab).refresh_contacts(),
+                )
+        self.push_screen(ContactCreateScreen(), handle_dismiss)
+
+    def open_contact_edit_dialog(self, contact: dict):
+        resource = contact.get("resource") or contact.get("resourceName") or ""
+        prefill = {
+            "name": GogAPI.contact_name(contact),
+            "email": GogAPI.contact_email(contact),
+            "phone": ContactsTab._contact_phone(contact),
+        }
+
+        async def handle_dismiss(result):
+            if result:
+                await self._run_mutation(
+                    "Updating contact...",
+                    GogAPI.contacts_update(
+                        resource,
+                        name=result.get("name"),
+                        email=result.get("email", ""),
+                        phone=result.get("phone", ""),
+                    ),
+                    "Contact updated.",
+                    lambda: self.query_one(ContactsTab).refresh_contacts(),
+                )
+        self.push_screen(ContactCreateScreen(prefill=prefill), handle_dismiss)
 
     def open_task_create_dialog(self, tasklist_id: str):
         async def handle_dismiss(result):
