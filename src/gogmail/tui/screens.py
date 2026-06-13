@@ -182,7 +182,7 @@ class SettingsScreen(ModalScreen):
         self._settings = settings or {}
 
     def compose(self):
-        yield Vertical(
+        yield VerticalScroll(
             Label("Settings", classes="dialog-title"),
             Label("Voice & Speech", classes="settings-section"),
             Checkbox(
@@ -207,6 +207,21 @@ class SettingsScreen(ModalScreen):
                 "the offline fallback is espeak-ng/spd-say/say.",
                 classes="settings-hint",
             ),
+            Label("Appearance", classes="settings-section"),
+            Checkbox(
+                "Show monochrome service icons in the sidebar",
+                value=bool(self._settings.get("show_icons", False)),
+                id="set-show-icons",
+            ),
+            Label("Optional services", classes="settings-section"),
+            Label(
+                "These need their own Google API enabled in your Cloud project "
+                "before they work; enable the API first, then turn the tab on here.",
+                classes="settings-hint",
+            ),
+            Checkbox("Photos", value=bool(self._settings.get("service_photos", False)), id="set-svc-photos"),
+            Checkbox("YouTube", value=bool(self._settings.get("service_youtube", False)), id="set-svc-youtube"),
+            Checkbox("Classroom", value=bool(self._settings.get("service_classroom", False)), id="set-svc-classroom"),
             Label("Backup", classes="settings-section"),
             Label(
                 "Export this account into an encrypted backup repository "
@@ -232,6 +247,10 @@ class SettingsScreen(ModalScreen):
                 "voice_input": self.query_one("#set-voice-input", Checkbox).value,
                 "spoken_replies": self.query_one("#set-spoken-replies", Checkbox).value,
                 "tts_engine": "auto" if self.query_one("#set-natural-voice", Checkbox).value else "system",
+                "show_icons": self.query_one("#set-show-icons", Checkbox).value,
+                "service_photos": self.query_one("#set-svc-photos", Checkbox).value,
+                "service_youtube": self.query_one("#set-svc-youtube", Checkbox).value,
+                "service_classroom": self.query_one("#set-svc-classroom", Checkbox).value,
             })
         else:
             self.dismiss(None)

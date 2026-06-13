@@ -401,6 +401,12 @@
     border: none;
 }
 
+/* The Settings dialog has many controls; bound its height so it scrolls
+   instead of clipping on smaller terminals. */
+SettingsScreen #dialog-container {
+    height: 80%;
+}
+
 .settings-section {
     text-style: bold;
     margin-top: 1;

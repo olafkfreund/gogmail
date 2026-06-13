@@ -244,6 +244,31 @@ class TestUiSmoke(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(app.query_one("#content-switcher").current, "tasks-view")
             self.assertIn("Ship it", result)
 
+    async def test_optional_service_toggle_and_icons(self):
+        from gogmail.app import GogMailApp
+        base = {"theme": "gruvbox", "ai_width": 40, "account": "",
+                "voice_input": False, "spoken_replies": False, "tts_engine": "auto",
+                "service_photos": False, "service_youtube": False,
+                "service_classroom": False, "show_icons": False}
+        with mock.patch("gogmail.app.load_config", return_value=dict(base)), \
+                mock.patch("gogmail.app.save_config"):
+            app = GogMailApp()
+            async with app.run_test(size=(120, 45)) as pilot:
+                await pilot.pause()
+                tree = app.query_one("#sidebar-tree")
+                def types():
+                    return [(n.data or {}).get("type") for n in tree.root.children]
+                self.assertNotIn("photos", types())  # off by default
+                gmail_label = str(tree.root.children[0].label)
+                self.assertTrue(gmail_label.startswith("▪"))  # plain marker, icons off
+                # Turn Photos on + icons on, rebuild as the settings save does.
+                app.config["service_photos"] = True
+                app.config["show_icons"] = True
+                app._build_sidebar()
+                await pilot.pause()
+                self.assertIn("photos", types())
+                self.assertFalse(str(tree.root.children[0].label).startswith("▪"))  # now an icon
+
     async def test_command_palette_opens_with_gogmail_provider(self):
         from textual.command import CommandPalette
         from gogmail.app import GogMailApp, GogMailCommands

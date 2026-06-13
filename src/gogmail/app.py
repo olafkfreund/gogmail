@@ -44,7 +44,9 @@ def load_config() -> dict:
     """Load persisted settings, falling back to sensible defaults."""
     defaults = {"theme": DEFAULT_THEME, "ai_width": 40, "account": "",
                 "voice_input": False, "spoken_replies": False,
-                "tts_engine": "auto", "tts_voice": "Kore"}
+                "tts_engine": "auto", "tts_voice": "Kore",
+                "service_photos": False, "service_youtube": False,
+                "service_classroom": False, "show_icons": False}
     path = get_config_path()
     if os.path.exists(path):
         try:
@@ -625,6 +627,25 @@ TREE_LOADERS = {
     "sites": "refresh_sites",
 }
 
+# Services that require their own Google API to be enabled before use (they 403
+# otherwise), so they're opt-in via Settings and hidden by default.
+OPTIONAL_SERVICES = [
+    ("photos", "Photos"),
+    ("youtube", "YouTube"),
+    ("classroom", "Classroom"),
+]
+
+# Monochrome (text-presentation) sidebar icons, used when show_icons is on.
+# All are BMP glyphs that render colorless and single-width; the ones with an
+# emoji variant get U+FE0E to force the text (monochrome) presentation. When
+# icons are off, the plain "▪" marker is used instead.
+SIDEBAR_ICONS = {
+    "gmail": "✉︎", "calendar": "▦", "drive": "◇", "meet": "▷",
+    "zoom": "►", "contacts": "☺︎", "tasks": "☑︎", "chat": "✎",
+    "keep": "◳", "groups": "⚇", "sites": "⌂", "photos": "▣",
+    "youtube": "⏵", "classroom": "◨", "accounts": "◉", "settings": "⚙︎",
+}
+
 
 class AIAssistantPanel(Vertical):
     """The side panel for chatting with the Gemini AI assistant."""
@@ -941,42 +962,51 @@ class GogMailApp(App):
 
     def _build_sidebar(self):
         tree = self.query_one("#sidebar-tree")
+        tree.clear()  # safe on first build; lets us rebuild when toggles change
         tree.show_root = False
 
-        # Single-width geometric markers only: emoji render at inconsistent
-        # widths across terminals/fonts and make the sidebar look ragged.
-        gmail = tree.root.add("▪ Gmail", expand=True)
+        # Top-level marker: a monochrome service icon when show_icons is on,
+        # else the plain single-width "▪" (emoji render at inconsistent widths,
+        # so icons are opt-in). Sub-items always use "•".
+        icons = self.config.get("show_icons", False)
+
+        def m(svc: str) -> str:
+            return SIDEBAR_ICONS.get(svc, "▪") if icons else "▪"
+
+        gmail = tree.root.add(f"{m('gmail')} Gmail", expand=True)
         gmail.add_leaf("• Inbox", data={"type": "gmail", "query": "label:INBOX"})
         gmail.add_leaf("• Starred", data={"type": "gmail", "query": "is:starred"})
         gmail.add_leaf("• Sent", data={"type": "gmail", "query": "is:sent"})
         gmail.add_leaf("• Drafts", data={"type": "gmail", "query": "is:draft"})
         gmail.add_leaf("• Trash", data={"type": "gmail", "query": "is:trash"})
 
-        tree.root.add_leaf("▪ Calendar", data={"type": "calendar"})
+        tree.root.add_leaf(f"{m('calendar')} Calendar", data={"type": "calendar"})
 
-        drive = tree.root.add("▪ Drive", expand=True)
+        drive = tree.root.add(f"{m('drive')} Drive", expand=True)
         drive.add_leaf("• All Files", data={"type": "drive"})
         drive.add_leaf("• Docs", data={"type": "docs"})
         drive.add_leaf("• Sheets", data={"type": "sheets"})
         drive.add_leaf("• Slides", data={"type": "slides"})
         drive.add_leaf("• Forms", data={"type": "forms"})
 
-        tree.root.add_leaf("▪ Meet", data={"type": "meet"})
-        tree.root.add_leaf("▪ Zoom", data={"type": "zoom"})
-        tree.root.add_leaf("▪ Contacts", data={"type": "contacts"})
-        tree.root.add_leaf("▪ Tasks", data={"type": "tasks"})
-        tree.root.add_leaf("▪ Chat", data={"type": "chat"})
-        tree.root.add_leaf("▪ Keep", data={"type": "keep"})
-        tree.root.add_leaf("▪ Groups", data={"type": "groups"})
-        tree.root.add_leaf("▪ Photos", data={"type": "photos"})
-        tree.root.add_leaf("▪ YouTube", data={"type": "youtube"})
-        tree.root.add_leaf("▪ Classroom", data={"type": "classroom"})
-        tree.root.add_leaf("▪ Sites", data={"type": "sites"})
+        tree.root.add_leaf(f"{m('meet')} Meet", data={"type": "meet"})
+        tree.root.add_leaf(f"{m('zoom')} Zoom", data={"type": "zoom"})
+        tree.root.add_leaf(f"{m('contacts')} Contacts", data={"type": "contacts"})
+        tree.root.add_leaf(f"{m('tasks')} Tasks", data={"type": "tasks"})
+        tree.root.add_leaf(f"{m('chat')} Chat", data={"type": "chat"})
+        tree.root.add_leaf(f"{m('keep')} Keep", data={"type": "keep"})
+        tree.root.add_leaf(f"{m('groups')} Groups", data={"type": "groups"})
+        tree.root.add_leaf(f"{m('sites')} Sites", data={"type": "sites"})
+        # Photos/YouTube/Classroom each need their own Google API enabled, so
+        # they're opt-in: only shown when toggled on in Settings.
+        for svc, label in OPTIONAL_SERVICES:
+            if self.config.get(f"service_{svc}", False):
+                tree.root.add_leaf(f"{m(svc)} {label}", data={"type": svc})
 
         # Populated asynchronously from `gog auth list` in _preflight.
-        self._accounts_node = tree.root.add("▪ Accounts", expand=True)
+        self._accounts_node = tree.root.add(f"{m('accounts')} Accounts", expand=True)
 
-        settings = tree.root.add("▪ Settings", expand=True)
+        settings = tree.root.add(f"{m('settings')} Settings", expand=True)
         settings.add_leaf("• Preferences", data={"type": "settings"})
         settings.add_leaf("• Select Theme", data={"type": "select-theme"})
 
@@ -1612,9 +1642,15 @@ class GogMailApp(App):
                 return
             self.config.update(result)
             self.save_settings()
-            # Apply immediately: show/hide the mic button per the new setting.
+            # Apply immediately: mic button, and rebuild the sidebar so service
+            # toggles + the icon style take effect without a restart.
             try:
                 self.query_one(AIAssistantPanel).apply_settings()
+            except Exception:
+                pass
+            try:
+                self._build_sidebar()
+                self._populate_accounts(getattr(self, "accounts", []))
             except Exception:
                 pass
             self.notify_status("Settings saved.")

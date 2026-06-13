@@ -26,7 +26,7 @@ A modern, premium, feature-rich Terminal User Interface (TUI) client for Linux t
   - **Keep**: List notes, create and delete them.
   - **Groups**: List your Google Groups and their members.
   - **Backup**: Export your account into an encrypted backup (`gog backup`) from the Settings page.
-  - **Photos · YouTube · Classroom · Sites**: read-only tabs listing media, playlists, courses and sites.
+  - **Photos · YouTube · Classroom · Sites**: read-only tabs. Photos/YouTube/Classroom each need their own Google API enabled, so they're **opt-in via Settings** (off by default); Sites is always on.
 - **AI Integration (Gemini)**:
   - Toggleable, context-aware side panel — it sees the selected email, open doc, or task list.
   - **Agentic read + act tools**: "show me my latest emails", "what's on my calendar this week", "what are my open tasks", "find the doc about X", "draft a reply" — it fetches the data via `gog`, summarizes it, **and opens the matching client view** populated with the results.
@@ -34,7 +34,7 @@ A modern, premium, feature-rich Terminal User Interface (TUI) client for Linux t
   - **Write-action tools**: save a draft, star/label an email, share a file, edit an event, switch account, create a task list — all by asking.
   - **Pluggable backend**: the AI layer is behind an `LLMProvider` abstraction (`GOGMAIL_LLM_PROVIDER`), defaulting to Gemini.
   - **Voice control** (optional): push-to-talk mic button transcribes speech to drive the assistant, with optional **spoken replies** in Google's natural Gemini TTS voice (espeak fallback). Toggle both in the new **Settings** page.
-- **Visual Aesthetics**: Clean, responsive layout with six switchable themes; emoji-free single-width sidebar glyphs for crisp alignment.
+- **Visual Aesthetics**: Clean, responsive layout with six switchable themes; single-width sidebar markers by default, with an optional **monochrome icon** set (toggle in Settings).
 
 ---
 
