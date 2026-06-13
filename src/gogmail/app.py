@@ -17,7 +17,8 @@ from rich.markup import escape as rich_escape
 from gogmail.tui.widgets import (
     GmailTab, CalendarTab, DriveTab, DocsTab, SheetsTab,
     SlidesTab, FormsTab, MeetTab, ZoomTab, ContactsTab,
-    TasksTab, ChatTab, KeepTab, GroupsTab, StatusNotification
+    TasksTab, ChatTab, KeepTab, GroupsTab,
+    PhotosTab, YouTubeTab, ClassroomTab, SitesTab, StatusNotification
 )
 from gogmail.tui.screens import (
     ConfirmDialog, GmailLabelScreen, GmailAttachmentScreen, PromptDialog, SettingsScreen,
@@ -596,6 +597,10 @@ TREE_VIEWS = {
     "chat": ("chat-view", "Chat"),
     "keep": ("keep-view", "Keep"),
     "groups": ("groups-view", "Groups"),
+    "photos": ("photos-view", "Photos"),
+    "youtube": ("youtube-view", "YouTube"),
+    "classroom": ("classroom-view", "Classroom"),
+    "sites": ("sites-view", "Sites"),
 }
 
 # Node type -> the tab's initial-load coroutine method. Tabs load lazily on first
@@ -614,6 +619,10 @@ TREE_LOADERS = {
     "chat": "refresh_spaces",
     "keep": "refresh_notes",
     "groups": "refresh_groups",
+    "photos": "refresh_photos",
+    "youtube": "refresh_youtube",
+    "classroom": "refresh_classroom",
+    "sites": "refresh_sites",
 }
 
 
@@ -882,6 +891,10 @@ class GogMailApp(App):
                 yield ChatTab(id="chat-view")
                 yield KeepTab(id="keep-view")
                 yield GroupsTab(id="groups-view")
+                yield PhotosTab(id="photos-view")
+                yield YouTubeTab(id="youtube-view")
+                yield ClassroomTab(id="classroom-view")
+                yield SitesTab(id="sites-view")
 
             yield AISplitter(id="ai-splitter")
             yield AIAssistantPanel(id="ai-drawer")
@@ -955,6 +968,10 @@ class GogMailApp(App):
         tree.root.add_leaf("▪ Chat", data={"type": "chat"})
         tree.root.add_leaf("▪ Keep", data={"type": "keep"})
         tree.root.add_leaf("▪ Groups", data={"type": "groups"})
+        tree.root.add_leaf("▪ Photos", data={"type": "photos"})
+        tree.root.add_leaf("▪ YouTube", data={"type": "youtube"})
+        tree.root.add_leaf("▪ Classroom", data={"type": "classroom"})
+        tree.root.add_leaf("▪ Sites", data={"type": "sites"})
 
         # Populated asynchronously from `gog auth list` in _preflight.
         self._accounts_node = tree.root.add("▪ Accounts", expand=True)
