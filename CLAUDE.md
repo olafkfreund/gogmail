@@ -4,11 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-GogMail is a [Textual](https://textual.textualize.io/) TUI client for Google Workspace (Gmail, Calendar, Drive, Docs/Sheets/Slides/Forms, Meet, Zoom, Contacts, Tasks, Chat) plus an embedded Gemini AI assistant. It is a **thin TUI over external services** — it does not talk to Google APIs directly:
+GogMail is a [Textual](https://textual.textualize.io/) TUI client for Google Workspace (Gmail, Calendar, Drive, Docs/Sheets/Slides/Forms, Meet, Zoom, Contacts, Tasks, Chat, Keep, Groups, and the opt-in Photos/YouTube/Classroom/Sites tabs) plus an embedded Gemini AI assistant with optional voice control. It is a **thin TUI over external services** — it does not talk to Google APIs directly:
 
 - **All Workspace data flows through the `gog` CLI** (a separately installed tool), invoked as `gog --json <subcommand>`. The TUI never holds Google credentials; `gog` owns auth.
-- **AI flows through the Gemini REST API** over plain `requests`, keyed by `GEMINI_API_KEY`.
+- **AI flows through the Gemini REST API** over plain `requests`, keyed by `GEMINI_API_KEY`, behind an **`LLMProvider` abstraction** (`llm.py`, `get_provider()`, env `GOGMAIL_LLM_PROVIDER`, default `gemini`) so other backends can plug in. The assistant has read tools (search/list across services, which also open the matching tab) and write/action tools, plus voice in/out.
 - **Zoom meeting creation goes to the Zoom REST API** (`zoom_api.py`, `requests` in a thread, mirroring `gemini_api.py`) since gogcli only manages Zoom auth and has no meeting commands. Credentials come from `GOG_ZOOM_ACCOUNT_ID`/`GOG_ZOOM_CLIENT_ID`/`GOG_ZOOM_CLIENT_SECRET` (the same names gogcli accepts); the S2S app needs a `meeting:write` scope.
+- **Inline images** (Gmail embedded/remote, Drive previews, Photos thumbnails) render via **rich-pixels half-blocks** (`images.py`, `render_image`/`fetch_image_bytes`) — Rich renderables written into a RichLog, no terminal graphics protocol needed. Remote email images are opt-in (tracking-pixel protection).
+- **Packaging:** beyond the Nix flake/modules, releases ship signed `.deb`/`.rpm`/zipapp with an SBOM + scans (see `PACKAGING.md`); `packaging/` + `.github/workflows/release.yml` build them on a version tag.
 
 ## Commands
 

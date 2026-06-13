@@ -1,8 +1,11 @@
-# NixOS Installation & Configuration Guide for GogMail
+# Installation & Configuration Guide for GogMail
 
-This guide explains how to install and configure GogMail on NixOS using the provided flake and NixOS module options.
+This guide covers installing GogMail on **NixOS** (flake + modules) and on
+**other Linux distributions** via the signed `.deb` / `.rpm` packages or the
+portable zipapp. All builds require the [`gog` CLI](https://github.com/steipete/gogcli)
+on `PATH` (see Prerequisites below).
 
-## 0. Quick try (no install)
+## 0. Quick try on Nix (no install)
 
 ```bash
 nix run github:olafkfreund/gogmail        # run the app
@@ -10,9 +13,45 @@ nix develop github:olafkfreund/gogmail    # dev shell (python + gog + tools)
 nix flake check github:olafkfreund/gogmail  # build + run the test suite
 ```
 
-The packaged app wraps `gog` and the clipboard/browser/image tools onto its
-`PATH`, so it works without installing them separately (a `gog` already on your
-`PATH` still takes precedence).
+The packaged app wraps `gog` and the clipboard/browser/image/voice tools onto
+its `PATH`, so it works without installing them separately (a `gog` already on
+your `PATH` still takes precedence).
+
+## 0b. Packaged installs (Debian/Ubuntu, Fedora/RHEL, or any Linux)
+
+Every [GitHub release](https://github.com/olafkfreund/gogmail/releases) attaches
+a `.deb`, an `.rpm`, and a self-contained `gogmail.pyz` zipapp (plus an SBOM,
+scan reports, and a cosign-signed `SHA256SUMS`). They bundle GogMail's Python
+dependencies, so the only runtime requirement is `python3 >= 3.10` (and `gog`).
+
+```bash
+# Debian / Ubuntu
+sudo apt install ./gogmail_<ver>_all.deb
+
+# Fedora / RHEL / openSUSE
+sudo dnf install ./gogmail-<ver>.noarch.rpm
+
+# Any Linux — run the portable zipapp directly (no install)
+python3 gogmail.pyz
+```
+
+The packages *recommend* `ffmpeg`, `espeak-ng`, `alsa-utils`, `wl-clipboard`
+and `xclip` (for voice and clipboard) but don't hard-depend on them. Install
+`gog` separately and run `gog auth login` first.
+
+### Verify before installing
+
+```bash
+sha256sum -c SHA256SUMS                 # checksums match the release
+cosign verify-blob \                    # signature is genuine (keyless / Sigstore)
+  --bundle SHA256SUMS.cosign.bundle \
+  --certificate-identity-regexp 'https://github.com/olafkfreund/gogmail/.+' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  SHA256SUMS
+```
+
+Full provenance — what each artifact is, how it's built from source, and the
+no-secrets guarantee — is documented in [`PACKAGING.md`](PACKAGING.md).
 
 ## 1. Prerequisites
 

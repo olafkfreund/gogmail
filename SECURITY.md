@@ -7,8 +7,8 @@ Please upgrade to the most recent version before reporting a vulnerability.
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 1.4.x   | :white_check_mark: |
-| < 1.4   | :x:                |
+| 1.5.x   | :white_check_mark: |
+| < 1.5   | :x:                |
 
 ## Reporting a vulnerability
 
