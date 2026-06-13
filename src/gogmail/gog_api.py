@@ -767,3 +767,20 @@ class GogAPI:
     async def chat_send_message(space_id: str, text: str) -> bool:
         success, _ = await run_gog(["chat", "messages", "send", space_id, "--text", text])
         return success
+
+    # --- Backup ---
+    @staticmethod
+    async def backup(destination: str = None, services: str = None) -> tuple[bool, str]:
+        """Export the account into an encrypted backup via `gog backup push`.
+
+        This is a long-running mutation. `destination` is the local backup
+        repository path (passed as `--repo`); `services` is a comma-separated
+        list (e.g. "gmail,calendar,drive") passed as `--services`. `--no-input`
+        keeps it non-interactive. Returns (success, message)."""
+        args = ["backup", "push", "--no-input"]
+        if destination:
+            args += ["--repo", destination]
+        if services:
+            args += ["--services", services]
+        success, res = await run_gog(args)
+        return success, _str_result(res)
