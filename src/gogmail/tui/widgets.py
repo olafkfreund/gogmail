@@ -1225,6 +1225,25 @@ class SheetsTab(DriveMimeTab):
     REF_BTN_ID = "sheet-ref-btn"
     BROWSER_BTN_ID = "sheet-browser-btn"
     NEW_DIALOG = "open_sheet_create_dialog"
+    GRID_RANGE = "A1:G20"
+
+    # Tracks the spreadsheet whose values are currently shown in the grid, so
+    # the Edit Cell / Append Row buttons know what to mutate and reload.
+    current_spreadsheet_id = None
+
+    def _header(self):
+        return Horizontal(
+            Label(self.HEADER, classes="view-header"),
+            Horizontal(
+                Button(self.NEW_LABEL, variant="success", id=self.NEW_BTN_ID),
+                Button("Edit Cell", variant="primary", id="sheet-edit-cell-btn"),
+                Button("Append Row", variant="primary", id="sheet-append-row-btn"),
+                Button("Browser", variant="primary", id=self.BROWSER_BTN_ID),
+                Button("Refresh", id=self.REF_BTN_ID),
+                classes="header-buttons"
+            ),
+            classes="view-header-row"
+        )
 
     def compose(self):
         yield self._header()
@@ -1238,14 +1257,14 @@ class SheetsTab(DriveMimeTab):
         super().on_mount()
         self.query_one("#sheet-grid").cursor_type = "cell"
 
-    async def on_data_table_row_selected(self, event: DataTable.RowSelected):
-        if event.data_table.id != "sheets-list-table":
+    async def reload_grid(self):
+        """(Re)populate the grid from the currently-tracked spreadsheet."""
+        spreadsheet_id = self.current_spreadsheet_id
+        if not spreadsheet_id:
             return
-        spreadsheet_id = event.row_key.value
         self.post_message(StatusNotification(f"Fetching sheet values for {spreadsheet_id}..."))
 
-        # Fetch cell values from a default range (A1:G20)
-        res = await GogAPI.sheets_get(spreadsheet_id, "A1:G20")
+        res = await GogAPI.sheets_get(spreadsheet_id, self.GRID_RANGE)
 
         grid = self.query_one("#sheet-grid")
         # columns=True: stale headers from a previously-viewed (wider) sheet
@@ -1255,7 +1274,7 @@ class SheetsTab(DriveMimeTab):
         values = res.get("values", [])
         if not values:
             grid.add_columns("Empty Sheet")
-            grid.add_row("No values in range A1:G20.")
+            grid.add_row(f"No values in range {self.GRID_RANGE}.")
         else:
             max_cols = max(len(row) for row in values)
             grid.add_columns(*[chr(65 + i) for i in range(max_cols)])
@@ -1263,6 +1282,29 @@ class SheetsTab(DriveMimeTab):
                 grid.add_row(*(row + [""] * (max_cols - len(row))))
 
         self.post_message(StatusNotification("Sheet data loaded."))
+
+    async def on_data_table_row_selected(self, event: DataTable.RowSelected):
+        if event.data_table.id != "sheets-list-table":
+            return
+        self.current_spreadsheet_id = event.row_key.value
+        await self.reload_grid()
+
+    async def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "sheet-edit-cell-btn":
+            if not self.current_spreadsheet_id:
+                self.post_message(StatusNotification("Open a spreadsheet first.", is_error=True))
+                return
+            grid = self.query_one("#sheet-grid")
+            coord = grid.cursor_coordinate  # Coordinate(row, column)
+            cell = f"{chr(65 + coord.column)}{coord.row + 1}"
+            self.app.open_sheet_edit_cell_dialog(self.current_spreadsheet_id, cell)
+        elif event.button.id == "sheet-append-row-btn":
+            if not self.current_spreadsheet_id:
+                self.post_message(StatusNotification("Open a spreadsheet first.", is_error=True))
+                return
+            self.app.open_sheet_append_dialog(self.current_spreadsheet_id)
+        else:
+            await super().on_button_pressed(event)
 
 
 class SlidesTab(DriveMimeTab):

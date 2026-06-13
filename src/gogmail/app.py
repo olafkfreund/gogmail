@@ -1353,6 +1353,25 @@ class GogMailApp(App):
             lambda: self.query_one(SheetsTab).refresh_list(),
         )
 
+    def open_sheet_edit_cell_dialog(self, spreadsheet_id: str, cell: str):
+        sheets = self.query_one(SheetsTab)
+        self._open_prompt(
+            f"Edit cell {cell}", "Enter cell value",
+            lambda v: GogAPI.sheets_set_cell(spreadsheet_id, cell, v),
+            f"Updating {cell}...", f"Cell {cell} updated.",
+            lambda: sheets.reload_grid(),
+        )
+
+    def open_sheet_append_dialog(self, spreadsheet_id: str):
+        sheets = self.query_one(SheetsTab)
+        self._open_prompt(
+            "Append row", "Comma-separated cell values",
+            lambda v: GogAPI.sheets_append_row(
+                spreadsheet_id, [c.strip() for c in v.split(",")]),
+            "Appending row...", "Row appended.",
+            lambda: sheets.reload_grid(),
+        )
+
     def open_slide_create_dialog(self):
         self._open_prompt(
             "Create Google Slides", "Enter presentation title",
