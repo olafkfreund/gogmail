@@ -15,19 +15,20 @@ A modern, premium, feature-rich Terminal User Interface (TUI) client for Linux t
 
 - **Integrated Services**: Contains specialized dashboards for:
   - **Gmail**: Read, search, archive, trash, compose, reply, **star, apply labels, and save drafts**; recipient autocomplete from contacts.
-  - **Calendar**: Agenda view, details panel, RSVP responses, create and delete events.
+  - **Calendar**: Agenda view, details panel, RSVP responses, create, **edit** and delete events. Compose/edit opens as a **right-docked panel with a fullscreen toggle**.
   - **Drive**: Browse, search, upload, download, create folders, delete, **share, rename, and move**; click a file to open it in the browser.
-  - **Docs, Sheets, Slides, Forms**: Interactive lists, read/cat Docs, render Sheets inside a grid/table, create new documents/spreadsheets/presentations/forms.
+  - **Docs, Sheets, Slides, Forms**: Interactive lists, read/cat Docs, render Sheets inside a grid/table, open in the browser, create new documents/spreadsheets/presentations/forms.
   - **Meet**: Instantly create video conference spaces and copy links.
-  - **Zoom**: Validate Server-to-Server OAuth configuration.
-  - **Contacts & People**: Fast search and details card for connections.
+  - **Zoom**: **Create instant meetings** that launch your Zoom client, plus validate Server-to-Server OAuth.
+  - **Contacts & People**: Fast search and details card for connections; resolves real names in Chat.
   - **Tasks**: Checklists supporting multiple task lists, marking tasks complete/incomplete, adding and deleting.
-  - **Chat**: Real-time spaces listing, messages history, and sending text chats.
+  - **Chat**: Real-time spaces listing, messages history (with real participant names), and sending text chats.
 - **AI Integration (Gemini)**:
-  - Toggleable side panel drawer that acts as a context-aware chat partner.
-  - Automatically receives context (selected email body, document text, active tasks list) depending on your current active view.
-  - Email composing helper that writes replies/drafts directly based on your instructions.
-- **Visual Aesthetics**: Clean, responsive layout utilizing a customized catppuccin-themed dark palette with vibrant accents.
+  - Toggleable, context-aware side panel — it sees the selected email, open doc, or task list.
+  - **Agentic read + act tools**: "show me my latest emails", "what's on my calendar this week", "what are my open tasks", "find the doc about X", "draft a reply" — it fetches the data via `gog`, summarizes it, **and opens the matching client view** populated with the results.
+  - Email composing helper that writes replies/drafts directly from your instructions.
+  - **Voice control** (optional): push-to-talk mic button transcribes speech to drive the assistant, with optional **spoken replies** in Google's natural Gemini TTS voice (espeak fallback). Toggle both in the new **Settings** page.
+- **Visual Aesthetics**: Clean, responsive layout with six switchable themes; emoji-free single-width sidebar glyphs for crisp alignment.
 
 ---
 
