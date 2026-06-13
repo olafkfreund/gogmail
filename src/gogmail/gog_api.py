@@ -806,6 +806,40 @@ class GogAPI:
         """Members of a group (each: email, role). Reads return [] on failure."""
         success, res = await run_gog(["groups", "members", group_email])
         return _extract_list(success, res, "members")
+    # --- Niche services (read-only) ---
+    # Photos, YouTube, Classroom and Sites are niche APIs that often need extra
+    # scopes (and the API enabled in the OAuth project). Any runtime permission
+    # error surfaces via the error sink, so the wiring is correct even when the
+    # account can't read them; reads return [] on failure.
+    @staticmethod
+    async def photos_list() -> list:
+        """App-created media items from the Photos Library API (each has
+        `id`, `filename`, `mimeType`, `mediaMetadata`). Reads return [] on
+        failure (surfaced via the error sink)."""
+        success, res = await run_gog(["photos", "list"])
+        return _extract_list(success, res, "mediaItems")
+
+    @staticmethod
+    async def youtube_list() -> list:
+        """The authenticated user's YouTube playlists (each has `id`,
+        `snippet`, `contentDetails`). Uses `--mine`, which requires an active
+        account. Reads return [] on failure."""
+        success, res = await run_gog(["youtube", "playlists", "list", "--mine"])
+        return _extract_list(success, res, "items")
+
+    @staticmethod
+    async def classroom_list() -> list:
+        """Google Classroom courses (each has `id`, `name`, `section`,
+        `courseState`). Reads return [] on failure."""
+        success, res = await run_gog(["classroom", "courses", "list"])
+        return _extract_list(success, res, "courses")
+
+    @staticmethod
+    async def sites_list() -> list:
+        """Google Sites visible in Drive (each is a Drive file: `id`, `name`,
+        `webViewLink`, `modifiedTime`). Reads return [] on failure."""
+        success, res = await run_gog(["sites", "list"])
+        return _extract_list(success, res, "files")
     # --- Backup ---
     @staticmethod
     async def backup(destination: str = None, services: str = None) -> tuple[bool, str]:

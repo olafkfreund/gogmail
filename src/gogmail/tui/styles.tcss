@@ -302,6 +302,63 @@
     padding: 1;
 }
 
+/* Photos View */
+#photos-split {
+    layout: horizontal;
+    height: 1fr;
+}
+
+#photos-table {
+    width: 50fr;
+    height: 100%;
+}
+
+#photos-detail {
+    width: 50fr;
+    height: 100%;
+    padding: 1;
+}
+
+/* YouTube View */
+#youtube-split {
+    layout: horizontal;
+    height: 1fr;
+}
+
+#youtube-table {
+    width: 50fr;
+    height: 100%;
+}
+
+#youtube-detail {
+    width: 50fr;
+    height: 100%;
+    padding: 1;
+}
+
+/* Classroom View */
+#classroom-split {
+    layout: horizontal;
+    height: 1fr;
+}
+
+#classroom-table {
+    width: 50fr;
+    height: 100%;
+}
+
+#classroom-detail {
+    width: 50fr;
+    height: 100%;
+    padding: 1;
+}
+
+/* Sites View */
+#sites-table {
+    height: 1fr;
+    width: 100%;
+}
+
 /* AI Assistant Drawer Splitter */
 #ai-splitter {
     width: 1;
@@ -482,6 +539,9 @@ GmailComposeScreen, CalendarCreateScreen {
 .theme-gruvbox #chat-message-pane,
 .theme-gruvbox #contact-detail,
 .theme-gruvbox #keep-detail,
+.theme-gruvbox #photos-detail,
+.theme-gruvbox #youtube-detail,
+.theme-gruvbox #classroom-detail,
 .theme-gruvbox #tasks-table {
     background: #32302f;
     border-left: solid #504945;
@@ -595,6 +655,9 @@ GmailComposeScreen, CalendarCreateScreen {
 .theme-catppuccin #chat-message-pane,
 .theme-catppuccin #contact-detail,
 .theme-catppuccin #keep-detail,
+.theme-catppuccin #photos-detail,
+.theme-catppuccin #youtube-detail,
+.theme-catppuccin #classroom-detail,
 .theme-catppuccin #tasks-table {
     background: #181825;
     border-left: solid #313244;
@@ -708,6 +771,9 @@ GmailComposeScreen, CalendarCreateScreen {
 .theme-nord #chat-message-pane,
 .theme-nord #contact-detail,
 .theme-nord #keep-detail,
+.theme-nord #photos-detail,
+.theme-nord #youtube-detail,
+.theme-nord #classroom-detail,
 .theme-nord #tasks-table {
     background: #3b4252;
     border-left: solid #4c566a;
@@ -821,6 +887,9 @@ GmailComposeScreen, CalendarCreateScreen {
 .theme-dracula #chat-message-pane,
 .theme-dracula #contact-detail,
 .theme-dracula #keep-detail,
+.theme-dracula #photos-detail,
+.theme-dracula #youtube-detail,
+.theme-dracula #classroom-detail,
 .theme-dracula #tasks-table {
     background: #1d1f27;
     border-left: solid #44475a;
@@ -934,6 +1003,9 @@ GmailComposeScreen, CalendarCreateScreen {
 .theme-monokai #chat-message-pane,
 .theme-monokai #contact-detail,
 .theme-monokai #keep-detail,
+.theme-monokai #photos-detail,
+.theme-monokai #youtube-detail,
+.theme-monokai #classroom-detail,
 .theme-monokai #tasks-table {
     background: #3e3d32;
     border-left: solid #49483e;
@@ -1047,6 +1119,9 @@ GmailComposeScreen, CalendarCreateScreen {
 .theme-solarized #chat-message-pane,
 .theme-solarized #contact-detail,
 .theme-solarized #keep-detail,
+.theme-solarized #photos-detail,
+.theme-solarized #youtube-detail,
+.theme-solarized #classroom-detail,
 .theme-solarized #tasks-table {
     background: #073642;
     border-left: solid #586e75;

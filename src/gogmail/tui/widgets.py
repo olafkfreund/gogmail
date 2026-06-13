@@ -2044,3 +2044,274 @@ class GroupsTab(Vertical):
     async def on_data_table_row_selected(self, event: DataTable.RowSelected):
         self.selected_group_email = event.row_key.value
         await self.refresh_members()
+
+
+# --- NICHE SERVICE TABS (read-only) ---
+# Photos / YouTube / Classroom / Sites are niche Workspace APIs that frequently
+# need extra OAuth scopes (or the API enabled in the project). Any permission
+# error surfaces via the gog error sink, so these tabs are correct wiring even
+# when the account can't read the service. Each is a read-only list with a
+# detail pane, modelled on GroupsTab. All API strings written to the RichLog are
+# escaped with rich_escape (markup is enabled).
+class PhotosTab(Vertical):
+    """Google Photos: app-created media items on the left, item detail on the
+    right. The Photos Library API only exposes media this app created."""
+
+    def compose(self):
+        yield Horizontal(
+            Label(" Google Photos ", classes="view-header"),
+            Horizontal(
+                Button("Refresh", id="photos-ref-btn"),
+                classes="header-buttons"
+            ),
+            classes="view-header-row"
+        )
+        yield Horizontal(
+            DataTable(id="photos-table"),
+            RichLog(id="photos-detail", highlight=True, markup=True, wrap=True, min_width=0),
+            id="photos-split"
+        )
+
+    def on_mount(self):
+        table = self.query_one("#photos-table")
+        table.cursor_type = "row"
+        table.add_columns("Filename", "Type", "Created")
+
+    async def refresh_photos(self):
+        self.post_message(StatusNotification("Loading photos..."))
+        table = self.query_one("#photos-table")
+        table.clear()
+        self.query_one("#photos-detail").clear()
+
+        items = await GogAPI.photos_list()
+        self.photos_data = items
+        for it in items:
+            item_id = it.get("id") or ""
+            filename = it.get("filename") or "(unnamed)"
+            mime = it.get("mimeType") or ""
+            created = (it.get("mediaMetadata") or {}).get("creationTime") or ""
+            table.add_row(filename, mime, created, key=item_id)
+
+        self.post_message(StatusNotification(f"Loaded {len(items)} photos."))
+
+    def _selected_item(self) -> dict:
+        table = self.query_one("#photos-table")
+        if table.cursor_row is None or not getattr(self, "photos_data", None):
+            return {}
+        item_id = table.ordered_rows[table.cursor_row].key.value
+        return next((it for it in self.photos_data if it.get("id") == item_id), {})
+
+    async def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "photos-ref-btn":
+            await self.refresh_photos()
+
+    async def on_data_table_row_selected(self, event: DataTable.RowSelected):
+        item = self._selected_item()
+        log = self.query_one("#photos-detail")
+        log.clear()
+        if not item:
+            return
+        log.write(f"[bold magenta]{rich_escape(item.get('filename') or '(unnamed)')}[/bold magenta]\n")
+        meta = item.get("mediaMetadata") or {}
+        for label, value in (
+            ("Type", item.get("mimeType")),
+            ("Created", meta.get("creationTime")),
+            ("Dimensions", f"{meta.get('width')}x{meta.get('height')}"
+                if meta.get("width") and meta.get("height") else None),
+            ("Description", item.get("description")),
+        ):
+            if value:
+                log.write(f"[cyan]{label}:[/cyan] {rich_escape(str(value))}")
+        url = item.get("productUrl") or item.get("baseUrl")
+        if url:
+            log.write(f"\n[blue underline]{rich_escape(url)}[/blue underline]")
+        item_id = item.get("id") or ""
+        if item_id:
+            log.write(f"\n[dim]ID: {rich_escape(item_id)}[/dim]")
+
+
+class YouTubeTab(Vertical):
+    """YouTube: the authenticated user's playlists on the left, playlist detail
+    on the right (via the YouTube Data API)."""
+
+    def compose(self):
+        yield Horizontal(
+            Label(" YouTube ", classes="view-header"),
+            Horizontal(
+                Button("Refresh", id="youtube-ref-btn"),
+                classes="header-buttons"
+            ),
+            classes="view-header-row"
+        )
+        yield Horizontal(
+            DataTable(id="youtube-table"),
+            RichLog(id="youtube-detail", highlight=True, markup=True, wrap=True, min_width=0),
+            id="youtube-split"
+        )
+
+    def on_mount(self):
+        table = self.query_one("#youtube-table")
+        table.cursor_type = "row"
+        table.add_columns("Playlist", "Videos", "Privacy")
+
+    async def refresh_youtube(self):
+        self.post_message(StatusNotification("Loading playlists..."))
+        table = self.query_one("#youtube-table")
+        table.clear()
+        self.query_one("#youtube-detail").clear()
+
+        items = await GogAPI.youtube_list()
+        self.youtube_data = items
+        for it in items:
+            pl_id = it.get("id") or ""
+            snippet = it.get("snippet") or {}
+            title = snippet.get("title") or "(untitled)"
+            count = str((it.get("contentDetails") or {}).get("itemCount", ""))
+            privacy = (it.get("status") or {}).get("privacyStatus") or ""
+            table.add_row(title, count, privacy, key=pl_id)
+
+        self.post_message(StatusNotification(f"Loaded {len(items)} playlists."))
+
+    def _selected_item(self) -> dict:
+        table = self.query_one("#youtube-table")
+        if table.cursor_row is None or not getattr(self, "youtube_data", None):
+            return {}
+        pl_id = table.ordered_rows[table.cursor_row].key.value
+        return next((it for it in self.youtube_data if it.get("id") == pl_id), {})
+
+    async def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "youtube-ref-btn":
+            await self.refresh_youtube()
+
+    async def on_data_table_row_selected(self, event: DataTable.RowSelected):
+        item = self._selected_item()
+        log = self.query_one("#youtube-detail")
+        log.clear()
+        if not item:
+            return
+        snippet = item.get("snippet") or {}
+        log.write(f"[bold magenta]{rich_escape(snippet.get('title') or '(untitled)')}[/bold magenta]\n")
+        for label, value in (
+            ("Videos", (item.get("contentDetails") or {}).get("itemCount")),
+            ("Privacy", (item.get("status") or {}).get("privacyStatus")),
+            ("Published", snippet.get("publishedAt")),
+            ("Channel", snippet.get("channelTitle")),
+            ("Description", snippet.get("description")),
+        ):
+            if value not in (None, ""):
+                log.write(f"[cyan]{label}:[/cyan] {rich_escape(str(value))}")
+        pl_id = item.get("id") or ""
+        if pl_id:
+            log.write(f"\n[dim]ID: {rich_escape(pl_id)}[/dim]")
+
+
+class ClassroomTab(Vertical):
+    """Google Classroom: courses on the left, course detail on the right."""
+
+    def compose(self):
+        yield Horizontal(
+            Label(" Google Classroom ", classes="view-header"),
+            Horizontal(
+                Button("Refresh", id="classroom-ref-btn"),
+                classes="header-buttons"
+            ),
+            classes="view-header-row"
+        )
+        yield Horizontal(
+            DataTable(id="classroom-table"),
+            RichLog(id="classroom-detail", highlight=True, markup=True, wrap=True, min_width=0),
+            id="classroom-split"
+        )
+
+    def on_mount(self):
+        table = self.query_one("#classroom-table")
+        table.cursor_type = "row"
+        table.add_columns("Course", "Section", "State")
+
+    async def refresh_classroom(self):
+        self.post_message(StatusNotification("Loading courses..."))
+        table = self.query_one("#classroom-table")
+        table.clear()
+        self.query_one("#classroom-detail").clear()
+
+        courses = await GogAPI.classroom_list()
+        self.classroom_data = courses
+        for c in courses:
+            course_id = c.get("id") or ""
+            name = c.get("name") or "(unnamed)"
+            section = c.get("section") or ""
+            state = c.get("courseState") or ""
+            table.add_row(name, section, state, key=course_id)
+
+        self.post_message(StatusNotification(f"Loaded {len(courses)} courses."))
+
+    def _selected_course(self) -> dict:
+        table = self.query_one("#classroom-table")
+        if table.cursor_row is None or not getattr(self, "classroom_data", None):
+            return {}
+        course_id = table.ordered_rows[table.cursor_row].key.value
+        return next((c for c in self.classroom_data if c.get("id") == course_id), {})
+
+    async def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "classroom-ref-btn":
+            await self.refresh_classroom()
+
+    async def on_data_table_row_selected(self, event: DataTable.RowSelected):
+        course = self._selected_course()
+        log = self.query_one("#classroom-detail")
+        log.clear()
+        if not course:
+            return
+        log.write(f"[bold magenta]{rich_escape(course.get('name') or '(unnamed)')}[/bold magenta]\n")
+        for label, value in (
+            ("Section", course.get("section")),
+            ("Room", course.get("room")),
+            ("State", course.get("courseState")),
+            ("Owner", course.get("ownerId")),
+            ("Description", course.get("descriptionHeading") or course.get("description")),
+        ):
+            if value:
+                log.write(f"[cyan]{label}:[/cyan] {rich_escape(str(value))}")
+        url = course.get("alternateLink")
+        if url:
+            log.write(f"\n[blue underline]{rich_escape(url)}[/blue underline]")
+        course_id = course.get("id") or ""
+        if course_id:
+            log.write(f"\n[dim]ID: {rich_escape(course_id)}[/dim]")
+
+
+class SitesTab(Vertical):
+    """Google Sites (Drive-backed): a full-width list of the sites visible in
+    Drive."""
+
+    def compose(self):
+        yield Horizontal(
+            Label(" Google Sites ", classes="view-header"),
+            Horizontal(
+                Button("Refresh", id="sites-ref-btn"),
+                classes="header-buttons"
+            ),
+            classes="view-header-row"
+        )
+        yield DataTable(id="sites-table")
+
+    def on_mount(self):
+        table = self.query_one("#sites-table")
+        table.cursor_type = "row"
+        table.add_columns("Name", "Modified", "Link")
+
+    async def refresh_sites(self):
+        self.post_message(StatusNotification("Loading sites..."))
+        table = self.query_one("#sites-table")
+        table.clear()
+
+        sites = await GogAPI.sites_list()
+        self.sites_data = sites
+        for s in sites:
+            site_id = s.get("id") or ""
+            name = s.get("name") or "(unnamed)"
+            modified = s.get("modifiedTime") or ""
+            link = s.get("webViewLink") or ""
+            table.add_row(name, modified, link, key=site_id)
+
+        self.post_message(StatusNotification(f"Loaded {len(sites)} sites."))
