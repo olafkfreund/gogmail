@@ -356,6 +356,7 @@ class GmailTab(Vertical):
                     Button("Label", variant="primary", id="gmail-label-btn"),
                     Button("Archive", variant="primary", id="gmail-archive-btn"),
                     Button("Trash", variant="error", id="gmail-trash-btn"),
+                    Button("Attachments", variant="primary", id="gmail-attachments-btn"),
                     Button("AI Summary", variant="primary", id="gmail-summary-btn"),
                     Button("Browser", variant="primary", id="gmail-browser-btn"),
                     Button("Copy Body", variant="primary", id="gmail-copy-btn"),
@@ -498,6 +499,8 @@ class GmailTab(Vertical):
                 self.post_message(StatusNotification("Unstarred." if starred else "Starred."))
         elif event.button.id == "gmail-label-btn":
             self.app.open_gmail_label_dialog(thread_id)
+        elif event.button.id == "gmail-attachments-btn":
+            self.app.open_gmail_attachments_dialog(thread_id)
         elif event.button.id == "gmail-archive-btn":
             await GogAPI.gmail_archive(thread_id)
             self.post_message(StatusNotification(f"Archived {thread_id}"))
