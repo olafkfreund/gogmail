@@ -16,3 +16,4 @@ result-*
 # Runtime state & logs
 gogmail.log
 settings.json
+dist/

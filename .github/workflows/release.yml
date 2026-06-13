@@ -1,0 +1,74 @@
+name: release
+
+# Build signed, scanned .deb/.rpm packages (+ zipapp, SBOM) on a version tag.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write      # create the release + upload assets
+  id-token: write      # keyless cosign signing via OIDC (no stored key)
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build + scan tooling
+        run: |
+          python -m pip install --upgrade pip shiv pip-audit
+          # syft (SBOM) + grype (vuln scan)
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sudo sh -s -- -b /usr/local/bin
+          curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sudo sh -s -- -b /usr/local/bin
+          # nfpm (.deb + .rpm) from the official apt repo
+          echo 'deb [trusted=yes] https://repo.goreleaser.com/apt/ /' | sudo tee /etc/apt/sources.list.d/goreleaser.list
+          sudo apt-get update && sudo apt-get install -y nfpm
+
+      - uses: sigstore/cosign-installer@v3
+
+      - name: Build artifacts, SBOM and scans
+        run: |
+          export GOGMAIL_VERSION="${GITHUB_REF_NAME#v}"
+          [ "$GITHUB_REF_NAME" = "$GITHUB_REF" ] && export GOGMAIL_VERSION="0.0.0-dev"  # workflow_dispatch
+          packaging/build.sh
+
+      - name: Sign SHA256SUMS (keyless / Sigstore)
+        run: |
+          cd dist
+          COSIGN_EXPERIMENTAL=1 cosign sign-blob --yes \
+            --bundle SHA256SUMS.cosign.bundle \
+            --output-certificate SHA256SUMS.pem \
+            --output-signature SHA256SUMS.sig \
+            SHA256SUMS
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/gogmail.pyz
+            dist/gogmail_*_all.deb
+            dist/gogmail-*.noarch.rpm
+            dist/gogmail.cdx.json
+            dist/gogmail.spdx.json
+            dist/grype-report.txt
+            dist/pip-audit.json
+            dist/requirements.lock.txt
+            dist/SHA256SUMS
+            dist/SHA256SUMS.cosign.bundle
+            dist/SHA256SUMS.pem
+            dist/SHA256SUMS.sig
+          body_path: PACKAGING.md
+
+      - name: Upload artifacts (for non-tag runs)
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: gogmail-packages
+          path: dist/*

@@ -40,6 +40,15 @@ A modern, premium, feature-rich Terminal User Interface (TUI) client for Linux t
 
 ---
 
+## Installing
+
+- **NixOS / Nix**: `nix run github:olafkfreund/gogmail`, or use the flake's NixOS / Home Manager modules — see [`nixos_install.md`](nixos_install.md).
+- **Debian / Ubuntu**: `sudo apt install ./gogmail_<ver>_all.deb`
+- **Fedora / RHEL / openSUSE**: `sudo dnf install ./gogmail-<ver>.noarch.rpm`
+- **Any Linux**: run the self-contained zipapp directly — `python3 gogmail.pyz` (needs `python3 >= 3.10`).
+
+The `.deb`/`.rpm`/zipapp, an **SBOM** (CycloneDX + SPDX), **vulnerability/dependency scan** reports, and a **cosign-signed `SHA256SUMS`** are attached to each [GitHub release](https://github.com/olafkfreund/gogmail/releases). They bundle GogMail's Python deps but contain **no secrets**; how they're built and how to verify them is documented in [`PACKAGING.md`](PACKAGING.md). All packages require the [`gog` CLI](https://github.com/steipete/gogcli) on PATH.
+
 ## Getting Started
 
 ### Using Devenv & Just (Recommended)

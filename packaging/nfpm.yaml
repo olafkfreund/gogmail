@@ -1,0 +1,60 @@
+# nfpm config — builds the .deb and .rpm from one source.
+# Build: GOGMAIL_VERSION=0.1.0 nfpm package -f packaging/nfpm.yaml -p deb -t dist/
+#        GOGMAIL_VERSION=0.1.0 nfpm package -f packaging/nfpm.yaml -p rpm -t dist/
+# The payload is the self-contained dist/gogmail.pyz (pure Python, arch-independent).
+name: gogmail
+arch: all
+platform: linux
+version: ${GOGMAIL_VERSION}
+maintainer: "Olaf Krasicki-Freund <olaf@freundcloud.com>"
+description: |
+  Modern terminal (TUI) client for Google Workspace — Gmail, Calendar, Drive,
+  Docs/Sheets/Slides/Forms, Meet, Zoom, Contacts, Tasks and Chat — with an
+  embedded Gemini AI assistant and optional voice control. GogMail is a thin UI
+  over the `gog` CLI (which owns Google auth); AI, voice transcription and TTS
+  go through the Gemini API. No Google or API credentials are bundled — they are
+  read at runtime from your environment.
+vendor: "GogMail"
+homepage: "https://github.com/olafkfreund/gogmail"
+license: "MIT"
+section: net
+priority: optional
+
+contents:
+  - src: dist/gogmail.pyz
+    dst: /usr/lib/gogmail/gogmail.pyz
+  - src: packaging/gogmail.launcher
+    dst: /usr/bin/gogmail
+    file_info:
+      mode: 0755
+  - src: LICENSE
+    dst: /usr/share/doc/gogmail/LICENSE
+  - src: README.md
+    dst: /usr/share/doc/gogmail/README.md
+  - src: PACKAGING.md
+    dst: /usr/share/doc/gogmail/PACKAGING.md
+
+# Runtime: only python3 is required (deps are bundled in the .pyz). `gog`
+# (gogcli) is a prerequisite but is not in distro repos, so it is documented
+# rather than declared. The rest are optional, for clipboard / voice / preview.
+depends:
+  - python3
+overrides:
+  deb:
+    depends:
+      - "python3 (>= 3.10)"
+    recommends:
+      - ffmpeg
+      - espeak-ng
+      - alsa-utils
+      - wl-clipboard
+      - xclip
+  rpm:
+    depends:
+      - "python3 >= 3.10"
+    recommends:
+      - ffmpeg
+      - espeak-ng
+      - alsa-utils
+      - wl-clipboard
+      - xclip

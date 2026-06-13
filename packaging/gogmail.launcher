@@ -1,0 +1,5 @@
+#!/bin/sh
+# GogMail launcher: runs the bundled self-contained zipapp with the system
+# Python 3. The .pyz already contains textual/requests/rich, so the only
+# runtime requirement is python3 (>=3.10) plus the `gog` CLI on PATH.
+exec python3 /usr/lib/gogmail/gogmail.pyz "$@"
