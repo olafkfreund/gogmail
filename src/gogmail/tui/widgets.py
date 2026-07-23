@@ -380,6 +380,23 @@ def relative_date(date_str: str) -> str:
     return dt.strftime("%Y-%m-%d")
 
 
+def _event_on_day(event: dict, day_str: str) -> bool:
+    """Whether a calendar `event` falls on the day `day_str` (YYYY-MM-DD).
+
+    All-day events carry an EXCLUSIVE `end.date` (a one-day event on the 23rd
+    has end.date = the 24th), so they show only through the day before end.date.
+    Timed events (`end.dateTime`) compare inclusively on the date part.
+    """
+    start = event.get("start", {}).get("dateTime", event.get("start", {}).get("date", ""))
+    if not start or start[:10] > day_str:
+        return False
+    end_date = event.get("end", {}).get("date")
+    if end_date:  # all-day: exclusive end
+        return day_str < end_date[:10]
+    end = event.get("end", {}).get("dateTime", "")
+    return day_str <= end[:10]
+
+
 class StatusNotification(Message):
     """Notify main app to update status bar. Set is_error to surface a toast."""
     def __init__(self, message: str, is_error: bool = False):
@@ -1010,13 +1027,7 @@ class CalendarTab(Vertical):
 
     def get_day_events(self, date_obj) -> list:
         day_str = date_obj.strftime("%Y-%m-%d")
-        results = []
-        for e in self.events_data:
-            start = e.get("start", {}).get("dateTime", e.get("start", {}).get("date", ""))
-            end = e.get("end", {}).get("dateTime", e.get("end", {}).get("date", ""))
-            if start[:10] <= day_str <= end[:10]:
-                results.append(e)
-        return results
+        return [e for e in self.events_data if _event_on_day(e, day_str)]
 
     def get_day_tasks(self, date_obj) -> list:
         day_str = date_obj.strftime("%Y-%m-%d")
@@ -1201,19 +1212,27 @@ class CalendarTab(Vertical):
         if event.button.id == "cal-edit-btn":
             self.app.open_calendar_edit_dialog(self.selected_event)
             return
-        elif event.button.id == "cal-del-btn":
+        # Act on the calendar the event actually belongs to (tagged in
+        # refresh_calendar), not always "primary" — else non-primary events
+        # silently no-op — and check the result instead of always claiming success.
+        cal_id = self.selected_event.get("_calendar", "primary")
+        if event.button.id == "cal-del-btn":
             summary = self.selected_event.get("summary", "(No Title)")
 
             async def do_delete():
-                await GogAPI.calendar_delete_event("primary", event_id)
-                self.post_message(StatusNotification("Event deleted."))
-                await self.refresh_calendar()
+                if await GogAPI.calendar_delete_event(cal_id, event_id):
+                    self.post_message(StatusNotification("Event deleted."))
+                    await self.refresh_calendar()
+                else:
+                    self.post_message(StatusNotification("Failed to delete event.", is_error=True))
             self.app.confirm(f"Delete event “{summary}”?", do_delete)
         elif event.button.id in ["cal-rsvp-yes", "cal-rsvp-no"]:
             resp = "yes" if event.button.id == "cal-rsvp-yes" else "no"
-            await GogAPI.calendar_respond_event("primary", event_id, resp)
-            self.post_message(StatusNotification(f"RSVP'd {resp} to event."))
-            await self.refresh_calendar()
+            if await GogAPI.calendar_respond_event(cal_id, event_id, resp):
+                self.post_message(StatusNotification(f"RSVP'd {resp} to event."))
+                await self.refresh_calendar()
+            else:
+                self.post_message(StatusNotification("Failed to RSVP to event.", is_error=True))
 
 
 # --- DRIVE TAB ---
@@ -1259,10 +1278,16 @@ class DriveTab(Vertical):
         self.files_data = files
         
         for f in files:
-            owner = f.get("owners", [{}])[0].get("displayName", "")
+            # owners is absent (or empty) for files in Shared Drives, so guard [0].
+            owners = f.get("owners") or []
+            owner = owners[0].get("displayName", "") if owners else ""
+            mime = f.get("mimeType", "")
+            # google-apps types are dotted (…apps.document -> "document"); ordinary
+            # ones aren't (image/png -> "png"), so pick the right separator.
+            kind = mime.rsplit(".", 1)[-1] if "." in mime else mime.split("/")[-1]
             table.add_row(
                 f.get("name", ""),
-                f.get("mimeType", "").split(".")[-1],
+                kind,
                 human_size(f.get("size")),
                 owner,
                 key=f.get("id")
@@ -1642,7 +1667,7 @@ class MeetTab(Vertical):
             if success:
                 self.app.copy_to_clipboard(link)
                 log.write("[bold green]Meeting created.[/bold green]\n")
-                log.write(f"[bold][link={link}]{link}[/link][/bold]\n")
+                log.write(f"[bold][link={link}]{rich_escape(link)}[/link][/bold]\n")
                 log.write("[dim]Copied to clipboard.[/dim]")
                 self.post_message(StatusNotification("Meet link copied to clipboard."))
             else:
@@ -1748,9 +1773,11 @@ class ContactsTab(Vertical):
         self.contacts_data = contacts
         
         for c in contacts:
-            name = c.get("name") or c.get("names", [{}])[0].get("displayName", "(No Name)")
-            email = c.get("email") or c.get("emailAddresses", [{}])[0].get("value", "")
-            phone = c.get("phone") or c.get("phoneNumbers", [{}])[0].get("value", "")
+            # Use the safe helpers (iterate-and-check): a contact with a present
+            # but EMPTY names/emailAddresses array would IndexError on [0].
+            name = GogAPI.contact_name(c) or "(No Name)"
+            email = GogAPI.contact_email(c)
+            phone = self._contact_phone(c)
             resource = c.get("resource") or c.get("resourceName") or ""
             table.add_row(name, email, phone, key=resource)
             
@@ -1829,37 +1856,40 @@ class ContactsTab(Vertical):
         for c in self.contacts_data:
             c_res = c.get("resource") or c.get("resourceName") or ""
             if c_res == res_name:
-                name = c.get("name") or c.get("names", [{}])[0].get("displayName", "")
-                log.write(f"[bold magenta]Name:[/bold magenta] {name}")
-                
+                # Escape every API-sourced value: a name/org like "Bob [Sales]"
+                # (a coworker's own profile) is untrusted and would otherwise be
+                # parsed as Rich markup and raise MarkupError.
+                name = GogAPI.contact_name(c)
+                log.write(f"[bold magenta]Name:[/bold magenta] {rich_escape(name)}")
+
                 emails = []
                 if "email" in c:
                     if c["email"]:
                         emails.append(c["email"])
                 else:
                     emails = [e.get("value") for e in c.get("emailAddresses", []) if e.get("value")]
-                log.write(f"[bold magenta]Emails:[/bold magenta] {', '.join(emails)}")
-                
+                log.write(f"[bold magenta]Emails:[/bold magenta] {rich_escape(', '.join(emails))}")
+
                 phones = []
                 if "phone" in c:
                     if c["phone"]:
                         phones.append(c["phone"])
                 else:
                     phones = [p.get("value") for p in c.get("phoneNumbers", []) if p.get("value")]
-                log.write(f"[bold magenta]Phones:[/bold magenta] {', '.join(phones)}")
-                
+                log.write(f"[bold magenta]Phones:[/bold magenta] {rich_escape(', '.join(phones))}")
+
                 bday = c.get("birthday")
                 if bday:
-                    log.write(f"[bold magenta]Birthday:[/bold magenta] {bday}")
-                
+                    log.write(f"[bold magenta]Birthday:[/bold magenta] {rich_escape(str(bday))}")
+
                 orgs = []
                 if "organization" in c and c["organization"]:
                     orgs.append(c["organization"])
                 else:
-                    orgs = [o.get("name", "") + (" - " + o.get("title", "") if o.get("title") else "") 
+                    orgs = [o.get("name", "") + (" - " + o.get("title", "") if o.get("title") else "")
                             for o in c.get("organizations", []) if o.get("name")]
                 if orgs:
-                    log.write(f"[bold magenta]Organization:[/bold magenta] {', '.join(orgs)}")
+                    log.write(f"[bold magenta]Organization:[/bold magenta] {rich_escape(', '.join(orgs))}")
                 break
 
 
