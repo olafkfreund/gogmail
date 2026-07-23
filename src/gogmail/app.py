@@ -18,7 +18,8 @@ from gogmail.tui.widgets import (
     GmailTab, CalendarTab, DriveTab, DocsTab, SheetsTab,
     SlidesTab, FormsTab, MeetTab, ZoomTab, ContactsTab,
     TasksTab, ChatTab, KeepTab, GroupsTab,
-    PhotosTab, YouTubeTab, ClassroomTab, SitesTab, StatusNotification
+    PhotosTab, YouTubeTab, ClassroomTab, SitesTab, StatusNotification,
+    best_email_text,
 )
 from gogmail.tui.screens import (
     ConfirmDialog, GmailLabelScreen, GmailAttachmentScreen, PromptDialog, SettingsScreen,
@@ -26,7 +27,7 @@ from gogmail.tui.screens import (
     GmailComposeScreen, KeepCreateScreen, ThemeSelectScreen, THEMES
 )
 from gogmail.gog_api import GogAPI, set_error_sink, set_account
-from gogmail.llm import get_provider
+from gogmail.gemini_api import GeminiAPI
 from gogmail import voice
 
 DEFAULT_THEME = "gruvbox"
@@ -251,7 +252,7 @@ async def _tool_draft_reply(app, params) -> str:
     if not msg:
         return "Error: no email is selected to reply to."
     headers = msg.get("headers", {})
-    draft = await get_provider().draft_reply(
+    draft = await GeminiAPI.draft_reply(
         original_subject=headers.get("subject", ""),
         original_sender=headers.get("from", ""),
         original_body=best_email_text(msg),
@@ -269,13 +270,11 @@ async def _tool_draft_reply(app, params) -> str:
 
 async def _tool_add_task(app, params) -> str:
     title = params.get("title")
-    lists = await GogAPI.tasks_lists()
-    if not lists:
-        return "Error: No Google Tasks lists found."
-    tasklist_id = lists[0].get("id")
-    if await GogAPI.tasks_add(tasklist_id, title, params.get("notes", "")):
+    # Write to the same "@default" list that list_tasks reads, so "add a task"
+    # then "show my tasks" can't disagree when the first list isn't the default.
+    if await GogAPI.tasks_add("@default", title, params.get("notes", "")):
         await app.safe_refresh(TasksTab, "refresh_tasks")
-        return f"Successfully added task '{title}' to list '{lists[0].get('title')}'."
+        return f"Successfully added task '{title}' to your default list."
     return "Failed to add task."
 
 
@@ -536,12 +535,23 @@ async def _speak_reply(config, text: str) -> None:
     engine = (config or {}).get("tts_engine", "auto")
     if engine in ("auto", "gemini") and os.environ.get("GEMINI_API_KEY"):
         voice_name = (config or {}).get("tts_voice", "Kore")
-        wav = await get_provider().synthesize_speech(text, voice_name)
+        wav = await GeminiAPI.synthesize_speech(text, voice_name)
         if wav and await asyncio.to_thread(voice.play_wav, wav):
             return
         if engine == "gemini":
             return  # explicit choice: don't fall back to the robotic engine
     await asyncio.to_thread(voice.speak, text)
+
+
+def _trim_history(history: list, limit: int = 24) -> list:
+    """Keep the last `limit` chat turns, but never let the window START on a
+    model/tool turn: Gemini expects the first content to be a user turn, and a
+    leading orphaned model reply (or a tool-result with no preceding call)
+    confuses the exchange. Drops leading non-user turns after truncating."""
+    trimmed = history[-limit:]
+    while trimmed and trimmed[0].get("role") != "user":
+        trimmed = trimmed[1:]
+    return trimmed
 
 
 def _extract_tool_call(response_text: str):
@@ -704,7 +714,7 @@ class AIAssistantPanel(Vertical):
                 os.remove(path)
             except OSError:
                 pass
-        text = await get_provider().transcribe_audio(audio)
+        text = await GeminiAPI.transcribe_audio(audio)
         text = (text or "").strip()
         if not text or text.startswith(("Error", "Exception")):
             self.app.notify_status("Could not transcribe the audio.", error=True)
@@ -723,7 +733,9 @@ class AIAssistantPanel(Vertical):
                     f"Active View: Gmail\n"
                     f"Selected Email Subject: {headers.get('subject', '')}\n"
                     f"Selected Email From: {headers.get('from', '')}\n"
-                    f"Selected Email Body:\n{tab.selected_msg.get('body', '')}\n"
+                    # best_email_text handles HTML-only mail; the raw body field
+                    # would feed the model empty text or a wall of tags.
+                    f"Selected Email Body:\n{best_email_text(tab.selected_msg)}\n"
                 )
         elif active_tab_id == "docs-view":
             viewer = main_app.query_one(DocsTab).query_one("#doc-viewer")
@@ -773,7 +785,7 @@ class AIAssistantPanel(Vertical):
         async def run_ai():
             max_steps = 8
             for step in range(max_steps):
-                response_text = await get_provider().generate_chat(self.chat_history, SYSTEM_INSTRUCTION)
+                response_text = await GeminiAPI.generate_chat(self.chat_history, SYSTEM_INSTRUCTION)
                 self.chat_history.append({"role": "model", "parts": [{"text": response_text}]})
 
                 tool_data = _extract_tool_call(response_text)
@@ -803,7 +815,7 @@ class AIAssistantPanel(Vertical):
                     {"role": "user", "parts": [{"text": f"Tool '{tool_name}' result: {result_msg[:3000]}"}]}
                 )
                 if len(self.chat_history) > 24:
-                    self.chat_history = self.chat_history[-24:]
+                    self.chat_history = _trim_history(self.chat_history)
                 log.write("[italic green]Gemini is thinking...[/italic green]")
 
             log.write(f"[bold red]Gemini: Execution limit reached (max {max_steps} tool calls).[/bold red]")

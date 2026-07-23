@@ -146,7 +146,6 @@ class GeminiAPI:
         sent inline (the API caps inline payloads at 20 MB, far above a short
         utterance). Returns the transcript, or an "Error:"/"Exception:" string.
         """
-        import base64
         data = base64.b64encode(audio_bytes).decode("ascii")
         contents = [{"parts": [
             {"inline_data": {"mime_type": mime_type, "data": data}},

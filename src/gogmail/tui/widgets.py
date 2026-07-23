@@ -3,9 +3,8 @@ from textual.containers import Vertical, Horizontal, Container
 from textual.message import Message
 from gogmail.gog_api import GogAPI
 from gogmail import images
-from gogmail.llm import get_provider
+from gogmail.gemini_api import GeminiAPI
 from gogmail.zoom_api import ZoomAPI
-from gogmail import images
 import asyncio
 import base64
 import calendar
@@ -690,24 +689,28 @@ class GmailTab(Vertical):
                 self.query_one("#gmail-switcher").current = "gmail-list-view"
                 await self.refresh_emails()
             self.app.confirm("Move this conversation to Trash?", do_trash, "Trash")
-        elif event.button.id == "gmail-read-btn":
-            await GogAPI.gmail_mark_read(thread_id)
-            self.post_message(StatusNotification(f"Marked {thread_id} as read"))
-            await self.refresh_emails()
         elif event.button.id == "gmail-browser-btn" and hasattr(self, "selected_msg"):
             msg = self.selected_msg
-            html_body = extract_html_body(msg)
-            body = html_body if html_body else msg.get("body", "")
-            try:
-                with tempfile.NamedTemporaryFile(suffix=".html", delete=False, mode="w", encoding="utf-8") as f:
-                    f.write(body)
-                    temp_path = f.name
-                # The browser needs the file after we return, so defer removal to app exit.
-                self.app.register_temp_file(temp_path)
-                webbrowser.open(f"file://{os.path.abspath(temp_path)}")
-                self.post_message(StatusNotification("Opened email in web browser."))
-            except Exception as e:
-                self.post_message(StatusNotification(f"Failed to open in browser: {str(e)}"))
+
+            async def do_open():
+                html_body = extract_html_body(msg)
+                body = html_body if html_body else msg.get("body", "")
+                try:
+                    with tempfile.NamedTemporaryFile(suffix=".html", delete=False, mode="w", encoding="utf-8") as f:
+                        f.write(body)
+                        temp_path = f.name
+                    # The browser needs the file after we return, so defer removal to app exit.
+                    self.app.register_temp_file(temp_path)
+                    webbrowser.open(f"file://{os.path.abspath(temp_path)}")
+                    self.post_message(StatusNotification("Opened email in web browser."))
+                except Exception as e:
+                    self.post_message(StatusNotification(f"Failed to open in browser: {str(e)}"))
+
+            # Opening the raw HTML in a real browser loads remote content (tracking
+            # pixels, images) regardless of the in-app privacy toggle, so confirm.
+            self.app.confirm(
+                "Open this email's raw HTML in your browser? Remote content "
+                "(including tracking pixels) will load.", do_open, "Open")
         elif event.button.id == "gmail-copy-btn" and hasattr(self, "selected_msg"):
             body_to_copy = best_email_text(self.selected_msg)
             self.app.copy_to_clipboard(body_to_copy)
@@ -719,7 +722,7 @@ class GmailTab(Vertical):
             body_view = self.query_one("#email-body-view")
             body_view.clear()
             body_view.write("[dim]Generating summary with Gemini…[/dim]")
-            summary = await get_provider().summarize_email(
+            summary = await GeminiAPI.summarize_email(
                 subject=headers.get("subject", ""),
                 sender=headers.get("from", ""),
                 # best_email_text handles HTML-only messages; the raw body
@@ -739,7 +742,9 @@ class GmailTab(Vertical):
         elif event.button.id == "gmail-reply-btn" and hasattr(self, "selected_msg"):
             msg = self.selected_msg
             headers = msg.get("headers", {})
-            orig_body = format_email_body(msg.get("body", ""))
+            # best_email_text handles HTML-only mail; the raw body field is empty
+            # or tag-soup for those, which would quote nothing into the reply.
+            orig_body = best_email_text(msg)
             quoted_lines = [f"> {line}" for line in orig_body.split("\n")]
             quoted_body = f"\n\nOn {headers.get('date', '')}, {headers.get('from', '')} wrote:\n" + "\n".join(quoted_lines)
             

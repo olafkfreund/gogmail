@@ -148,5 +148,31 @@ class TestThemeRegistry(unittest.TestCase):
         self.assertIn(app.DEFAULT_THEME, VALID_THEMES)
 
 
+class TestTrimHistory(unittest.TestCase):
+    def _u(self, i=0):
+        return {"role": "user", "parts": [{"text": f"u{i}"}]}
+
+    def _m(self, i=0):
+        return {"role": "model", "parts": [{"text": f"m{i}"}]}
+
+    def test_under_limit_is_unchanged(self):
+        h = [self._u(0), self._m(0)]
+        self.assertEqual(app._trim_history(h, limit=24), h)
+
+    def test_window_never_starts_on_a_model_turn(self):
+        # 26 alternating turns starting user -> the last 24 would begin on a
+        # model turn; the leading model turn must be dropped.
+        h = []
+        for i in range(13):
+            h.append(self._u(i))
+            h.append(self._m(i))
+        trimmed = app._trim_history(h, limit=24)
+        self.assertEqual(trimmed[0]["role"], "user")
+        self.assertLessEqual(len(trimmed), 24)
+
+    def test_all_model_turns_collapse_to_empty(self):
+        self.assertEqual(app._trim_history([self._m(0), self._m(1)], limit=24), [])
+
+
 if __name__ == "__main__":
     unittest.main()
