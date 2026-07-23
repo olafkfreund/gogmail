@@ -766,7 +766,10 @@ class AIAssistantPanel(Vertical):
         log = self.query_one("#ai-chat-history")
         log.write(f"\n[bold yellow]You:[/bold yellow] {rich_escape(prompt)}")
 
-        now_str = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S%z")
+        # .astimezone() makes it tz-aware so %z emits the local offset — without
+        # it the model gets a bare local time and can misplace day boundaries when
+        # resolving "today"/"this week" into RFC3339 for calendar calls.
+        now_str = datetime.datetime.now().astimezone().strftime("%Y-%m-%dT%H:%M:%S%z")
         account = getattr(self.app, "account", "") or "unknown"
         try:
             active_view = self.app.query_one("#content-switcher").current

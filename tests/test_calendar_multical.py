@@ -122,5 +122,39 @@ class TestMultiCalendarMerge(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(tags, {"primary", "team@x.com"})
 
 
+class TestEventOnDay(unittest.TestCase):
+    """All-day events use an exclusive end.date; timed events are inclusive."""
+
+    def _all_day(self, start, end):
+        return {"start": {"date": start}, "end": {"date": end}}
+
+    def _timed(self, start, end):
+        return {"start": {"dateTime": start}, "end": {"dateTime": end}}
+
+    def test_all_day_single_day_shows_only_on_start(self):
+        from gogmail.tui.widgets import _event_on_day
+        ev = self._all_day("2026-07-23", "2026-07-24")  # exclusive end
+        self.assertTrue(_event_on_day(ev, "2026-07-23"))
+        self.assertFalse(_event_on_day(ev, "2026-07-24"))  # the bug: was True
+        self.assertFalse(_event_on_day(ev, "2026-07-22"))
+
+    def test_all_day_multi_day_range(self):
+        from gogmail.tui.widgets import _event_on_day
+        ev = self._all_day("2026-07-23", "2026-07-26")  # 23,24,25
+        for day, expected in [("2026-07-23", True), ("2026-07-25", True),
+                              ("2026-07-26", False)]:
+            self.assertEqual(_event_on_day(ev, day), expected, day)
+
+    def test_timed_event_is_inclusive_on_date_part(self):
+        from gogmail.tui.widgets import _event_on_day
+        ev = self._timed("2026-07-23T09:00:00Z", "2026-07-23T10:00:00Z")
+        self.assertTrue(_event_on_day(ev, "2026-07-23"))
+        self.assertFalse(_event_on_day(ev, "2026-07-24"))
+
+    def test_missing_start_is_false(self):
+        from gogmail.tui.widgets import _event_on_day
+        self.assertFalse(_event_on_day({}, "2026-07-23"))
+
+
 if __name__ == "__main__":
     unittest.main()
