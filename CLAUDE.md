@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 GogMail is a [Textual](https://textual.textualize.io/) TUI client for Google Workspace (Gmail, Calendar, Drive, Docs/Sheets/Slides/Forms, Meet, Zoom, Contacts, Tasks, Chat, Keep, Groups, and the opt-in Photos/YouTube/Classroom/Sites tabs) plus an embedded Gemini AI assistant with optional voice control. It is a **thin TUI over external services** — it does not talk to Google APIs directly:
 
 - **All Workspace data flows through the `gog` CLI** (a separately installed tool), invoked as `gog --json <subcommand>`. The TUI never holds Google credentials; `gog` owns auth.
-- **AI flows through the Gemini REST API** over plain `requests`, keyed by `GEMINI_API_KEY`, behind an **`LLMProvider` abstraction** (`llm.py`, `get_provider()`, env `GOGMAIL_LLM_PROVIDER`, default `gemini`) so other backends can plug in. The assistant has read tools (search/list across services, which also open the matching tab) and write/action tools, plus voice in/out.
+- **AI flows through the Gemini REST API** over plain `requests`, keyed by `GEMINI_API_KEY`, via `GeminiAPI` (`gemini_api.py`) — call sites use it directly. The assistant has read tools (search/list across services, which also open the matching tab) and write/action tools, plus voice in/out.
 - **Zoom meeting creation goes to the Zoom REST API** (`zoom_api.py`, `requests` in a thread, mirroring `gemini_api.py`) since gogcli only manages Zoom auth and has no meeting commands. Credentials come from `GOG_ZOOM_ACCOUNT_ID`/`GOG_ZOOM_CLIENT_ID`/`GOG_ZOOM_CLIENT_SECRET` (the same names gogcli accepts); the S2S app needs a `meeting:write` scope.
 - **Inline images** (Gmail embedded/remote, Drive previews, Photos thumbnails) render via **rich-pixels half-blocks** (`images.py`, `render_image`/`fetch_image_bytes`) — Rich renderables written into a RichLog, no terminal graphics protocol needed. Remote email images are opt-in (tracking-pixel protection).
 - **Packaging:** beyond the Nix flake/modules, releases ship signed `.deb`/`.rpm`/zipapp with an SBOM + scans (see `PACKAGING.md`); `packaging/` + `.github/workflows/release.yml` build them on a version tag.
@@ -37,8 +37,6 @@ Nix outputs (`flake.nix`): `packages`/`apps`/`devShells`/`checks` per system, pl
 
 **Multiple accounts:** `gog` is multi-account; `run_gog` scopes API calls to the active account via `-a <email>` (set with `set_account`, never applied to `auth` commands). The app lists accounts via `GogAPI.list_accounts()`, shows them under the sidebar **Accounts** node, and `switch_account()` changes the active one (persisted to config, resets tab `_loaded` flags, reloads).
 
-> Note: the real working clone is `/home/olafkfreund/Source/GitHub/gogmail`. The `/mnt/data/...` primary dir is empty.
-
 ## Architecture
 
 Three layers, strictly separated:
@@ -55,7 +53,7 @@ Three layers, strictly separated:
    - `styles.tcss`: all styling, by theme-prefix class (`.theme-gruvbox ...`). Theme switches via `App.classes = f"theme-{name}"`.
 
 3. **App shell** (`src/gogmail/app.py`)
-   - `GogMailApp(App)`: left `Tree` sidebar → `ContentSwitcher` of 12 tabs → draggable `AISplitter` → `AIAssistantPanel`. Navigation via `on_tree_node_selected` using the `TREE_VIEWS` table.
+   - `GogMailApp(App)`: left `Tree` sidebar → `ContentSwitcher` of 18 tabs → draggable `AISplitter` → `AIAssistantPanel`. Navigation via `on_tree_node_selected` using the `TREE_VIEWS` table.
    - **Status is centralized** in `notify_status(message, error=False)` (updates subtitle prefixed with the resolved account; toasts on error). The `StatusNotification` message and the gog error sink both route here.
    - **Dialog dispatch is generalized:** simple create dialogs use `_open_prompt(...)`; all mutations run through `_run_mutation(working, coro, success, refresh)` for consistent status + refresh. Add a new simple dialog as a one-line `_open_prompt` call.
    - Config (`theme`, `ai_width`, `account`) persists to `~/.config/gogmail/settings.json` via `load_config`/`save_config`. Exported email temp files are tracked via `register_temp_file` and removed in `on_unmount`.
