@@ -107,7 +107,7 @@
           # A NixOS VM test that actually boots the module and proves the app
           # is installed system-wide with gog wired onto its PATH. Linux-only
           # (the test driver needs a Linux VM + KVM).
-          // pkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
+          // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
             nixos-module = pkgs.testers.runNixOSTest {
               name = "gogmail-nixos-module";
               nodes.machine = { pkgs, ... }: {
